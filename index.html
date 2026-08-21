@@ -115,6 +115,7 @@
   .gate-links a { color: var(--ink-soft); text-decoration: underline; cursor:pointer; }
 
   /* POS layout */
+  .pos-stack { display: flex; flex-direction: column; gap: 16px; }
   .pos-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
   @media (max-width: 900px) { .pos-grid { grid-template-columns: 1fr; } }
   .scan-box { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -691,54 +692,53 @@ function renderCheckout(openShift) {
   const earnPreview = pointsEarnedPreview(), maxRedeem = maxRedeemablePoints();
 
   return `
-  <div class="pos-grid">
-    <div>
-      <div class="card">
-        <h2>扫描 / 搜寻产品</h2>
-        <div class="scan-box">
-          <input id="scan-input" placeholder="用扫码枪扫描,或手动输入 SKU 後按 Enter" autocomplete="off">
-          <button class="btn btn-primary" onclick="handleScan(document.getElementById('scan-input').value); document.getElementById('scan-input').value='';">加入</button>
-        </div>
-        <div class="scan-hint">💡 已登入:${esc(state.currentStaff.name)} · 闲置5分钟会自动登出</div>
-        ${state.products.length===0 ? `<div class="empty">还没有产品资料,先到「产品」分頁新增。</div>` : `<div class="quick-grid">${quickProducts}</div>`}
+  <div class="pos-stack">
+    <div class="card">
+      <h2>扫描 / 搜寻产品</h2>
+      <div class="scan-box">
+        <input id="scan-input" placeholder="用扫码枪扫描,或手动输入 SKU 後按 Enter" autocomplete="off">
+        <button class="btn btn-primary" onclick="handleScan(document.getElementById('scan-input').value); document.getElementById('scan-input').value='';">加入</button>
       </div>
-      <div class="card"><h2>购物车</h2>${cartRows}</div>
+      <div class="scan-hint">💡 已登入:${esc(state.currentStaff.name)} · 闲置5分钟会自动登出</div>
+      ${state.products.length===0 ? `<div class="empty">还没有产品资料,先到「产品」分頁新增。</div>` : `<div class="quick-grid">${quickProducts}</div>`}
     </div>
-    <div>
-      <div class="card">
-        <h2>会员</h2>
-        ${state.selectedMember ? `
-          <div class="member-selected">
-            <div><div class="name">${esc(state.selectedMember.name)}</div><div class="pts">${esc(state.selectedMember.phone)} · 现有积分 ${state.selectedMember.points}</div></div>
-            <button class="btn-danger" onclick="deselectMember()">移除</button>
-          </div>
-          <div class="field"><label>使用积分抵扣(最多 ${maxRedeem} 分 = ${money(maxRedeem*state.config.pointValueRM)})</label><input type="number" min="0" max="${maxRedeem}" value="${state.redeemPoints}" oninput="setRedeemPoints(this.value)"></div>
-        ` : `
-          <input id="member-search-input" placeholder="输入电话或姓名搜寻会员" value="${esc(state.memberSearch)}">
-          ${filteredMembers.length>0 ? filteredMembers.map(m => `<div class="quick-card" style="margin-top:8px" onclick="selectMember('${escAttr(m.id)}')"><div class="qn">${esc(m.name)}</div><div class="qs">${esc(m.phone)} · 积分 ${m.points}</div></div>`).join('') : (state.memberSearch.trim()?'<div class="hint" style="margin-top:8px">找不到符合的会员</div>':'')}
-        `}
-      </div>
-      <div class="card">
-        <h2>付款方式</h2>
-        <div class="pay-grid">
-          <div class="pay-opt ${state.payMethod==='Cash'?'active':''}" onclick="setPayMethod('Cash')">Cash</div>
-          <div class="pay-opt ${state.payMethod==='Credit Card'?'active':''}" onclick="setPayMethod('Credit Card')">Credit Card</div>
-          <div class="pay-opt ${state.payMethod==='Debit Card'?'active':''}" onclick="setPayMethod('Debit Card')">Debit Card</div>
-          <div class="pay-opt ${state.payMethod==='E-wallet'?'active':''}" onclick="setPayMethod('E-wallet')">E-wallet</div>
+
+    <div class="card"><h2>购物车</h2>${cartRows}</div>
+
+    <div class="card">
+      <h2>会员</h2>
+      ${state.selectedMember ? `
+        <div class="member-selected">
+          <div><div class="name">${esc(state.selectedMember.name)}</div><div class="pts">${esc(state.selectedMember.phone)} · 现有积分 ${state.selectedMember.points}</div></div>
+          <button class="btn-danger" onclick="deselectMember()">移除</button>
         </div>
-        <div class="summary-row"><div>小计</div><div class="val">${money(subtotal)}</div></div>
-        ${discount>0?`<div class="summary-row"><div>积分折扣(${state.redeemPoints}分)</div><div class="val">−${money(discount)}</div></div>`:''}
-        ${roundAdj!==0?`<div class="summary-row"><div>现金捨入</div><div class="val">${roundAdj>0?'+':''}${money(roundAdj)}</div></div>`:''}
-        <div class="summary-row total"><div>总计</div><div class="val">${money(total)}</div></div>
-        ${state.payMethod==='Cash' ? `
-          <div class="field" style="margin-top:12px"><label>顾客支付金额 (RM)</label><input id="cash-tendered" type="text" inputmode="decimal" value="${state.cashTendered!=null?state.cashTendered:''}" oninput="setCashTendered(this.value.replace(/[^0-9.]/g,''))" placeholder="例如 150"></div>
-          ${state.cashTendered!=null && state.cashTendered!=='' && (parseFloat(state.cashTendered) - total) < 0 ? `<div class="summary-row" style="font-weight:800;color:var(--danger)"><div>不足</div><div class="val">${money(total - parseFloat(state.cashTendered))}</div></div>` : ''}
-        ` : ''}
-        <div class="hint" style="margin-top:6px">本单佣金:${money(cartCommission())} · 归属 ${esc(state.currentStaff.name)}${state.cart.some(c=>c.commissionType==='percent')?' (含百分比佣金,已按实际售价计算)':''}</div>
-        ${state.selectedMember?`<div class="hint">本次消费预计赚取 ${earnPreview} 积分</div>`:''}
-        <button class="btn btn-primary btn-full btn-lg" style="margin-top:16px" onclick="checkout('${escAttr(openShift.id)}')" ${(state.cart.length===0 || (state.payMethod==='Cash' && state.cashTendered!=null && state.cashTendered!=='' && parseFloat(state.cashTendered)<total))?'disabled':''}>完成结帐 · ${money(total)}</button>
-        ${state.cart.length>0?`<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearCart()">清空购物车</button>`:''}
+        <div class="field"><label>使用积分抵扣(最多 ${maxRedeem} 分 = ${money(maxRedeem*state.config.pointValueRM)})</label><input id="redeem-points-input" type="text" inputmode="numeric" value="${state.redeemPoints}" oninput="setRedeemPoints(this.value.replace(/[^0-9]/g,''))"></div>
+      ` : `
+        <input id="member-search-input" placeholder="输入电话或姓名搜寻会员" value="${esc(state.memberSearch)}">
+        ${filteredMembers.length>0 ? filteredMembers.map(m => `<div class="quick-card" style="margin-top:8px" onclick="selectMember('${escAttr(m.id)}')"><div class="qn">${esc(m.name)}</div><div class="qs">${esc(m.phone)} · 积分 ${m.points}</div></div>`).join('') : (state.memberSearch.trim()?'<div class="hint" style="margin-top:8px">找不到符合的会员</div>':'')}
+      `}
+    </div>
+
+    <div class="card">
+      <h2>付款方式</h2>
+      <div class="pay-grid">
+        <div class="pay-opt ${state.payMethod==='Cash'?'active':''}" onclick="setPayMethod('Cash')">Cash</div>
+        <div class="pay-opt ${state.payMethod==='Credit Card'?'active':''}" onclick="setPayMethod('Credit Card')">Credit Card</div>
+        <div class="pay-opt ${state.payMethod==='Debit Card'?'active':''}" onclick="setPayMethod('Debit Card')">Debit Card</div>
+        <div class="pay-opt ${state.payMethod==='E-wallet'?'active':''}" onclick="setPayMethod('E-wallet')">E-wallet</div>
       </div>
+      <div class="summary-row"><div>小计</div><div class="val">${money(subtotal)}</div></div>
+      ${discount>0?`<div class="summary-row"><div>积分折扣(${state.redeemPoints}分)</div><div class="val">−${money(discount)}</div></div>`:''}
+      ${roundAdj!==0?`<div class="summary-row"><div>现金捨入</div><div class="val">${roundAdj>0?'+':''}${money(roundAdj)}</div></div>`:''}
+      <div class="summary-row total"><div>总计</div><div class="val">${money(total)}</div></div>
+      ${state.payMethod==='Cash' ? `
+        <div class="field" style="margin-top:12px"><label>顾客支付金额 (RM)</label><input id="cash-tendered" type="text" inputmode="decimal" value="${state.cashTendered!=null?state.cashTendered:''}" oninput="setCashTendered(this.value.replace(/[^0-9.]/g,''))" placeholder="例如 150"></div>
+        ${state.cashTendered!=null && state.cashTendered!=='' && (parseFloat(state.cashTendered) - total) < 0 ? `<div class="summary-row" style="font-weight:800;color:var(--danger)"><div>不足</div><div class="val">${money(total - parseFloat(state.cashTendered))}</div></div>` : ''}
+      ` : ''}
+      <div class="hint" style="margin-top:6px">本单佣金:${money(cartCommission())} · 归属 ${esc(state.currentStaff.name)}${state.cart.some(c=>c.commissionType==='percent')?' (含百分比佣金,已按实际售价计算)':''}</div>
+      ${state.selectedMember?`<div class="hint">本次消费预计赚取 ${earnPreview} 积分</div>`:''}
+      <button class="btn btn-primary btn-full btn-lg" style="margin-top:16px" onclick="checkout('${escAttr(openShift.id)}')" ${(state.cart.length===0 || (state.payMethod==='Cash' && state.cashTendered!=null && state.cashTendered!=='' && parseFloat(state.cashTendered)<total))?'disabled':''}>完成结帐 · ${money(total)}</button>
+      ${state.cart.length>0?`<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearCart()">清空购物车</button>`:''}
     </div>
   </div>
   ${renderChangeModal()}`;
