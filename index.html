@@ -1,0 +1,2765 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tinker Toddler POS</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2C4E47">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TT POS">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- iMin Print/Drawer SDK: IminPrintInstance is only truly provided in the browser environment of iMin devices like the Falcon;
+     opening on a regular computer/phone doesn't affect other features, the system auto-detects and falls back to standard print. The actual
+     integration path should be confirmed against whatever iMin dev docs are current once a device is available (it may be an object injected natively, not necessarily needing an external script tag). -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #FAF7F2; --panel: #FFFFFF; --ink: #26302B; --ink-soft: #6B7570; --line: #E6E0D6;
+    --teal: #3F6E64; --teal-deep: #2C4E47; --coral: #E1815F; --coral-soft: #FBEAE1;
+    --amber: #C98A2B; --amber-soft: #FBF1DE; --danger: #C24A3F; --danger-soft: #FBEAE8;
+    --gold: #B9922F; --gold-soft: #F7F0DC;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  #app { max-width: 1180px; margin: 0 auto; padding: 18px 16px 80px; }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .brand { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; color: var(--teal-deep); }
+  .brand span { color: var(--coral); }
+  .subline { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); }
+  .shift-pill { display:inline-flex; align-items:center; gap:6px; background:#EAF2EF; color:var(--teal-deep); padding:5px 12px; border-radius:100px; font-size:12px; font-weight:700; }
+  .shift-pill.closed { background:#F4F1EA; color: var(--ink-soft); }
+  .staff-pill { display:inline-flex; align-items:center; gap:8px; background: var(--gold-soft); color:#7A5F1F; padding:6px 14px; border-radius:100px; font-size:13px; font-weight:700; }
+  .staff-pill button { border:none; background:#fff; color:#7A5F1F; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:12px; }
+
+  .tabs { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 18px; overflow-x: auto; }
+  .tab-btn { flex: 1; min-width: 80px; padding: 10px 10px; border: none; background: transparent; border-radius: 9px; font-family: var(--sans); font-weight: 600; font-size: 13px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+  .tab-btn:hover { color: var(--teal-deep); }
+  .tab-btn.active { background: var(--teal-deep); color: #fff; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin: 0 0 4px; color: var(--teal-deep); }
+  .card .hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 16px; }
+
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  label.btn { display: inline-flex; text-transform: none; letter-spacing: normal; font-size: 14px; font-weight: 700; margin-bottom: 0; }
+  .field { margin-bottom: 14px; }
+  input, select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 9px; font-family: var(--sans); font-size: 14px; background: #fff; color: var(--ink); }
+  input:focus, select:focus { outline: none; border-color: var(--teal); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .row4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .row, .row3, .row4 { grid-template-columns: 1fr; } }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 20px; border-radius: 9px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--teal-deep); color: #fff; }
+  .btn-primary:hover { background: var(--teal); }
+  .btn-ghost { background: var(--coral-soft); color: var(--coral); }
+  .btn-gold { background: var(--gold-soft); color: var(--gold); }
+  .btn-danger-solid { background: var(--danger); color:#fff; }
+  .btn-danger { background: #fff; color: var(--danger); border: 1.5px solid #F1D4CF; padding: 6px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-full { width: 100%; }
+  .btn-lg { padding: 16px; font-size: 16px; border-radius: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); border-bottom: 1.5px solid var(--line); font-weight: 700; white-space: nowrap; }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr.flagged td { background: var(--danger-soft); }
+  tr:last-child td { border-bottom: none; }
+  .sku-code { font-family: var(--mono); font-size: 12px; background: #F4F1EA; padding: 2px 6px; border-radius: 5px; }
+  .num { font-family: var(--mono); font-weight: 700; text-align: right; }
+  .red-text { color: var(--danger); font-weight:700; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+  .badge-promo { background: var(--coral-soft); color: var(--coral); }
+  .badge-gold { background: var(--gold-soft); color: var(--gold); }
+  .badge-danger { background: var(--danger-soft); color: var(--danger); }
+  .badge-teal { background:#EAF2EF; color:var(--teal-deep); }
+  .badge-tier-base { background:#F4F1EA; color:var(--ink-soft); }
+  .badge-tier-silver { background:#E9ECEF; color:#5A6472; }
+  .badge-tier-gold { background:var(--gold-soft); color:var(--gold); }
+  .badge-tier-platinum { background:#EDE7F6; color:#6A4FA3; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar select, .toolbar input { width: auto; min-width: 130px; flex: 1; }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--ink-soft); }
+  .empty .big { font-size: 32px; margin-bottom: 8px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--teal-deep); color: #fff; padding: 12px 22px; border-radius: 100px; font-size: 13.5px; font-weight: 600; opacity: 0; transition: all .25s ease; pointer-events: none; z-index: 60; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  .loading-wrap { display: flex; align-items: center; justify-content: center; padding: 60px 0; color: var(--ink-soft); font-size: 13px; }
+  .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--teal); animation: spin .7s linear infinite; margin-right: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: flex; align-items: center; gap: 8px; background: #F4F1EA; border-radius: 100px; padding: 6px 8px 6px 14px; font-size: 13px; font-weight: 600; }
+  .chip button { border: none; background: #fff; color: var(--ink-soft); width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 22px 0 10px; }
+  .section-title:first-child { margin-top: 0; }
+
+  /* Gate screens (open shift / login) */
+  .gate-wrap { max-width: 420px; margin: 40px auto; }
+  .gate-icon { font-size: 40px; text-align: center; margin-bottom: 6px; }
+  .gate-title { font-size: 19px; font-weight: 800; text-align: center; color: var(--teal-deep); margin-bottom: 4px; }
+  .gate-sub { font-size: 13px; text-align: center; color: var(--ink-soft); margin-bottom: 22px; }
+  .scan-input-lg { font-family: var(--mono); font-size: 17px; padding: 15px 14px; border: 2px solid var(--teal); border-radius: 10px; text-align:center; }
+  .scan-input-wrap { display: flex; gap: 8px; flex: 1; }
+  .scan-input-wrap input { flex: 1; }
+  .scan-display { flex: 1; font-family: var(--mono); padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 9px; background: #fff; display: flex; align-items: center; min-height: 20px; word-break: break-all; }
+  .scan-display.scan-input-lg { font-size: 17px; padding: 15px 14px; border: 2px solid var(--teal); border-radius: 10px; justify-content: center; text-align: center; }
+  .scan-placeholder { color: var(--ink-soft); }
+  .kb-btn { flex-shrink: 0; width: 48px; border: 1.5px solid var(--line); border-radius: 9px; background: #fff; font-size: 18px; cursor: pointer; }
+  .kb-btn:hover { background: #F4F1EA; }
+  .gate-links { display:flex; justify-content:center; gap: 18px; margin-top:18px; font-size: 12.5px; }
+  .gate-links a { color: var(--ink-soft); text-decoration: underline; cursor:pointer; }
+
+  /* POS layout */
+  .pos-stack { display: flex; flex-direction: column; gap: 16px; }
+  .pos-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 620px) { .pos-grid { grid-template-columns: 1fr; } }
+  .scan-box { display: flex; gap: 8px; margin-bottom: 10px; }
+  .scan-box input { font-family: var(--mono); font-size: 16px; padding: 14px 14px; border: 2px solid var(--teal); border-radius: 10px; }
+  .scan-hint { font-size: 12px; color: var(--ink-soft); margin: -4px 0 14px; }
+  .cart-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .cart-row:last-child { border-bottom: none; }
+  .cart-item-name { font-weight: 700; font-size: 14px; }
+  .cart-item-sub { font-size: 11.5px; color: var(--ink-soft); font-family: var(--mono); }
+  .qty-ctrl { display: flex; align-items: center; gap: 6px; }
+  .qty-btn { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; font-weight: 700; color: var(--teal-deep); }
+  .qty-val { min-width: 20px; text-align: center; font-family: var(--mono); font-weight: 700; }
+  .price-strike { text-decoration: line-through; color: var(--ink-soft); font-size: 11.5px; }
+  .member-selected { background: var(--gold-soft); border: 1.5px solid var(--gold); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .member-selected .name { font-weight: 800; color: #7A5F1F; }
+  .member-selected .pts { font-family: var(--mono); font-size: 12.5px; color: #7A5F1F; }
+  .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  .summary-row.total { font-size: 20px; font-weight: 800; border-top: 1.5px solid var(--line); margin-top: 8px; padding-top: 12px; color: var(--teal-deep); }
+  .summary-row .val { font-family: var(--mono); font-weight: 700; }
+  .pay-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 14px 0; }
+  .pay-opt { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 6px; text-align: center; cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+  .pay-opt.active { border-color: var(--teal); background: #EEF4F2; color: var(--teal-deep); }
+  .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; margin-top: 4px; }
+  .quick-card { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; background: #fff; }
+  .quick-card:hover { border-color: var(--teal); }
+  .quick-card .qn { font-weight: 700; font-size: 12.5px; margin-bottom: 4px; }
+  .quick-card .qs { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+  .quick-card .qp { font-family: var(--mono); font-weight: 800; color: var(--teal-deep); margin-top: 4px; }
+
+  /* Receipt / print */
+  #receipt-print { display: none; }
+  .receipt-paper { width: 260px; box-sizing: border-box; margin: 0 auto; font-family: var(--mono); font-size: 12px; color: #000; padding: 6px 4px; background: #fff; }
+  .receipt-paper.w58 { width: 185px; font-size: 9.5px; padding: 5px 3px; }
+  .receipt-paper .rc-title { text-align: center; font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  .receipt-paper.w58 .rc-title { font-size: 13px; }
+  .receipt-paper .rc-sub { text-align: center; font-size: 10px; margin-bottom: 6px; }
+  .receipt-paper hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+  .receipt-paper .rc-line { display: flex; justify-content: space-between; gap: 6px; margin: 3px 0; }
+  .receipt-paper .rc-line > div:last-child { text-align: right; flex-shrink: 0; }
+  .receipt-paper .rc-line > div:first-child { overflow-wrap: break-word; min-width: 0; }
+  .receipt-paper .rc-item-name { font-weight: 700; }
+  .receipt-paper .rc-total { font-weight: 700; font-size: 14px; }
+  .receipt-paper .rc-foot { text-align: center; margin-top: 12px; font-size: 10px; }
+  @media print {
+    /* Use display:none so other content truly disappears from the layout (not just invisible while still taking up space),
+       to avoid the case where the underlying page is very tall (e.g. the long transaction list on the "Records" tab),
+       causing the browser to compute several print pages, with the position:fixed receipt container then repeating on "every page",
+       resulting in several identical copies of the receipt being printed.*/
+    body > *:not(#receipt-print) { display: none !important; }
+    #receipt-print { display: block !important; position: static; width: 100%; }
+  }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(38,48,43,0.45); display: flex; align-items: center; justify-content: center; z-index: 40; padding: 16px; }
+  .modal { background: #fff; border-radius: 16px; padding: 24px; max-width: 380px; width: 100%; max-height: 85vh; overflow-y: auto; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .stat-row { grid-template-columns: repeat(2,1fr); } }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat .num { font-family: var(--mono); font-size: 19px; font-weight: 700; color: var(--teal-deep); }
+  .stat .label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading-wrap"><div class="spinner"></div>Loading POS system…</div></div>
+<div id="receipt-print"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxB27SdQrtB_muQB8XSnX2l8SC_BGpf5Bs1-IrEbRmrXY49kwpG28T_qN1trq_d2JcQ/exec';
+
+let state = {
+  loaded: false, tab: 'pos', posView: 'checkLoading',
+  config: { shopName:'Tinker Toddler', address:'', phone:'', sstNo:'', pointsPerRM:0.01, pointValueRM:0.333333, paperWidth:'80', adminPassword:'8689',
+    tiers: [
+      { name:'Member', threshold:0, earnRate:0.01, redeemRate:0.333333 },
+      { name:'Silver Member', threshold:300, earnRate:0.01, redeemRate:0.5 },
+      { name:'Gold Member', threshold:5000, earnRate:0.01, redeemRate:1 },
+      { name:'Platinum Member', threshold:10000, earnRate:0.01, redeemRate:1 },
+    ],
+    bundlePromotions: [],
+  },
+  staff: [], products: [], members: [], sales: [], shifts: [], drawerEvents: [], auditLog: [],
+  currentStaff: null, cart: [], selectedMember: null, redeemPoints: 0, payMethod: 'Cash', paymentLines: [], checkoutSubmitting: false,
+  manualDiscount: { type: 'amount', value: 0, note: '' },
+  itemDiscountModalSku: null, discountModalOpen: false,
+  memberSearch: '', idleTimer: null,
+  loginScanVal: '', drawerModalOpen: false, closeShiftModalOpen: false, openShiftModalOpen: false,
+  scanBuffers: { product:'', gate:'', login:'', drawer:'', close:'', editAuth:'', commissionAuth:'', returnAuth:'', settingsAuth:'', auditLogAuth:'' }, activeScanContext: null, manualEntryContext: null,
+  editAuthOpen: false, pendingEditSku: null, editingStaff: null, editAuthAction: null, editAuthRequireManager: false,
+  commissionAuthStaff: null,
+  auditLogAuthStaff: null,
+  settingsAuthStaff: null, settingsPasswordFallback: false,
+  returnAuthOpen: false, pendingReturnSaleId: null, returnStaff: null,
+  returnModalOpen: false, returnItems: [], returnNewCart: [], returnPayMethod: 'Cash', returnPaymentLines: [], returnSubmitting: false,
+  orderDetailSaleId: null,
+  memberDetailId: null, memberEditMode: false,
+  dangerAction: null, dangerPasswordInput: '',
+  editingSku: null,
+  recordsSubTab: 'sales', recFilterStaff: '', recFilterDate: '', recSearchQuery: '', productPage: 0, memberPage: 0, salesPage: 0,
+  shiftDetailId: null,
+};
+
+function showToast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { el.className = 'toast'; }, 2300);
+}
+function money(n) { return 'RM' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function escAttr(s) { return String(s).replace(/'/g, "\\'"); }
+function fmtDateTime(ts) { const d = new Date(ts); return d.toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDateTimeWithYear(ts) { const d = new Date(ts); return d.toLocaleDateString('en-GB',{year:'numeric',month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}); }
+
+// ============ Google Apps Script storage layer ============
+async function gasList(sheet) {
+  const res = await fetch(`${GAS_URL}?sheet=${sheet}&action=list`);
+  const data = await res.json();
+  return data.rows || [];
+}
+async function gasUpsert(sheet, row) {
+  const res = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'upsert', sheet, row }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'upsert failed');
+}
+async function gasBulkUpsert(sheet, rows) {
+  if (!rows || rows.length===0) return;
+  const res = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'bulkUpsert', sheet, rows }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'bulkUpsert failed');
+}
+async function gasDelete(sheet, id) {
+  const res = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'delete', sheet, id }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'delete failed');
+}
+async function gasClearSheet(sheet) {
+  const res = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'clearSheet', sheet }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'clearSheet failed');
+}
+async function gasSaveFile(filename, base64, mimeType) {
+  const res = await fetch(GAS_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action:'saveFile', filename, base64, mimeType }) });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'saveFile failed');
+  return data;
+}
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// ---- row <-> state object conversion ----
+function toBool(v) { return v === true || v === 'TRUE' || v === 'true'; }
+function numOr(v, def) { const n = parseFloat(v); return isNaN(n) ? def : n; }
+
+function parseProductRow(r) {
+  return {
+    sku: String(r.sku), brand: r.brand || '', name: r.name || '',
+    price: numOr(r.price, 0), promoPrice: (r.promoPrice===''||r.promoPrice==null) ? null : numOr(r.promoPrice, null),
+    promoActive: toBool(r.promoActive), commission: numOr(r.commission, 0), commissionType: r.commissionType || 'fixed',
+    barcodes: r.barcodes ? (() => { try { return JSON.parse(r.barcodes); } catch(e){ return []; } })() : [],
+    editedBy: r.editedBy || '', editedAt: r.editedAt || '',
+    bundleQty: numOr(r.bundleQty, 0), bundleDiscountType: r.bundleDiscountType || 'amount', bundleDiscountValue: numOr(r.bundleDiscountValue, 0),
+  };
+}
+function productToRow(p) {
+  return { sku:p.sku, brand:p.brand||'', name:p.name, price:p.price, promoPrice:p.promoPrice==null?'':p.promoPrice, promoActive: !!p.promoActive, commission: p.commission||0, commissionType: p.commissionType||'fixed', barcodes: JSON.stringify(p.barcodes||[]), editedBy: p.editedBy||'', editedAt: p.editedAt||'',
+    bundleQty: p.bundleQty||0, bundleDiscountType: p.bundleDiscountType||'amount', bundleDiscountValue: p.bundleDiscountValue||0 };
+}
+function parseMemberRow(r) { return { id:String(r.id), name:r.name||'', phone:String(r.phone||''), points: numOr(r.points,0), joinDate: r.joinDate||new Date().toISOString(), tier: r.tier || 'Member', totalSpend: numOr(r.totalSpend,0), storeCredit: numOr(r.storeCredit,0) }; }
+function memberToRow(m) { return { id:m.id, name:m.name, phone:m.phone, points:m.points, joinDate:m.joinDate, tier: m.tier||'Member', totalSpend: m.totalSpend||0, storeCredit: m.storeCredit||0 }; }
+function parseStaffRow(r) { return { id:String(r.id), name:r.name||'', barcode:String(r.barcode||''), role: r.role||'staff' }; }
+function staffToRow(s) { return { id:s.id, name:s.name, barcode:s.barcode, role:s.role||'staff' }; }
+function parseSaleRow(r) {
+  let items = []; try { items = JSON.parse(r.itemsJson||'[]'); } catch(e) {}
+  let payments = []; try { payments = r.paymentsJson ? JSON.parse(r.paymentsJson) : []; } catch(e) {}
+  if (payments.length===0 && r.payMethod) payments = [{ method: r.payMethod, amount: numOr(r.total,0) }]; // backward compatibility for older data
+  return {
+    id:String(r.id), timestamp:r.timestamp, shiftId:String(r.shiftId||''), cashier:r.cashier||'', cashierId:String(r.cashierId||''),
+    commissionStaff:r.commissionStaff||'', commissionStaffId:String(r.commissionStaffId||''), commissionTotal:numOr(r.commissionTotal,0),
+    items, subtotal:numOr(r.subtotal,0), discount:numOr(r.discount,0), cashRoundingAdj:numOr(r.cashRoundingAdj,0), total:numOr(r.total,0),
+    payMethod:r.payMethod||(payments[0]?payments[0].method:'Cash'), payments,
+    cashTendered: (r.cashTendered===''||r.cashTendered==null)?null:numOr(r.cashTendered,null),
+    changeGiven: (r.changeGiven===''||r.changeGiven==null)?null:numOr(r.changeGiven,null),
+    memberId: r.memberId?String(r.memberId): null, memberName: r.memberName||null, pointsEarned:numOr(r.pointsEarned,0), pointsRedeemed:numOr(r.pointsRedeemed,0),
+    type: r.type || 'sale', refSaleId: r.refSaleId || null, processedBy: r.processedBy || '',
+    transactionNumber: r.transactionNumber || String(r.id).slice(-8).toUpperCase(), // when older records have no number, fall back to the tail of the id instead, to avoid a blank
+    manualDiscountAmount: numOr(r.manualDiscountAmount,0), manualDiscountType: r.manualDiscountType || 'amount', manualDiscountNote: r.manualDiscountNote || '',
+    manualDiscountValue: numOr(r.manualDiscountValue,0),
+    bundlePromotions: (() => { try { return r.bundlePromotionsJson ? JSON.parse(r.bundlePromotionsJson) : []; } catch(e) { return []; } })(),
+    bundlePromotionsTotal: numOr(r.bundlePromotionsTotal,0),
+  };
+}
+function saleToRow(s) {
+  return { id:s.id, timestamp:s.timestamp, shiftId:s.shiftId, cashier:s.cashier, cashierId:s.cashierId, commissionStaff:s.commissionStaff, commissionStaffId:s.commissionStaffId,
+    commissionTotal:s.commissionTotal, itemsJson: JSON.stringify(s.items), subtotal:s.subtotal, discount:s.discount, cashRoundingAdj:s.cashRoundingAdj, total:s.total,
+    payMethod:s.payMethod, paymentsJson: JSON.stringify(s.payments||[]), cashTendered: s.cashTendered==null?'':s.cashTendered, changeGiven: s.changeGiven==null?'':s.changeGiven,
+    memberId: s.memberId||'', memberName: s.memberName||'', pointsEarned:s.pointsEarned, pointsRedeemed:s.pointsRedeemed,
+    type: s.type||'sale', refSaleId: s.refSaleId||'', processedBy: s.processedBy||'', transactionNumber: s.transactionNumber||'',
+    manualDiscountAmount: s.manualDiscountAmount||0, manualDiscountType: s.manualDiscountType||'amount', manualDiscountNote: s.manualDiscountNote||'',
+    manualDiscountValue: s.manualDiscountValue||0,
+    bundlePromotionsJson: JSON.stringify(s.bundlePromotions||[]), bundlePromotionsTotal: s.bundlePromotionsTotal||0 };
+}
+function generateTransactionNumber(type) {
+  // prefix indicates type: IN (sale) / ER (exchange) / RR (return), followed by 6 random alphanumeric characters, excluding the easily-confused 0/O, 1/I/L,
+  // completely unrelated to date/sequence, so it can't be used to tell which transaction number of the day/month it is
+  const prefix = type === 'exchange' ? 'ER' : type === 'return' ? 'RR' : 'IN';
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return prefix + s;
+}
+function parseShiftRow(r) {
+  let totals; try { totals = r.totalsJson ? JSON.parse(r.totalsJson) : undefined; } catch(e) {}
+  return { id:String(r.id), openedBy:String(r.openedBy||''), openedByName:r.openedByName||'', openedAt:r.openedAt, startingCash:numOr(r.startingCash,0),
+    status:r.status||'open', closedBy: r.closedBy?String(r.closedBy): undefined, closedByName:r.closedByName||undefined, closedAt:r.closedAt||undefined,
+    actualCash: r.actualCash===''?undefined:numOr(r.actualCash,undefined), expectedCash: r.expectedCash===''?undefined:numOr(r.expectedCash,undefined),
+    variance: r.variance===''?undefined:numOr(r.variance,undefined), totals };
+}
+function shiftToRow(s) {
+  return { id:s.id, openedBy:s.openedBy, openedByName:s.openedByName, openedAt:s.openedAt, startingCash:s.startingCash, status:s.status,
+    closedBy: s.closedBy||'', closedByName: s.closedByName||'', closedAt: s.closedAt||'', actualCash: s.actualCash==null?'':s.actualCash,
+    expectedCash: s.expectedCash==null?'':s.expectedCash, variance: s.variance==null?'':s.variance, totalsJson: s.totals?JSON.stringify(s.totals): '' };
+}
+function parseDrawerRow(r) { return { id:String(r.id), timestamp:r.timestamp, staffId:String(r.staffId||''), staffName:r.staffName||'', shiftId:String(r.shiftId||'') }; }
+function drawerToRow(e) { return { id:e.id, timestamp:e.timestamp, staffId:e.staffId, staffName:e.staffName, shiftId:e.shiftId||'' }; }
+function parseAuditRow(r) { return { id:String(r.id), timestamp:r.timestamp, staffId:String(r.staffId||''), staffName:r.staffName||'', action:r.action||'', details:r.details||'' }; }
+function auditToRow(a) { return { id:a.id, timestamp:a.timestamp, staffId:a.staffId, staffName:a.staffName, action:a.action, details:a.details }; }
+async function logAuditEvent(staff, action, details) {
+  if (!staff) return;
+  const entry = { id:'audit_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), timestamp:new Date().toISOString(), staffId:staff.id, staffName:staff.name, action, details:details||'' };
+  state.auditLog.push(entry);
+  try { await gasUpsert('AuditLog', auditToRow(entry)); } catch(e) { /* audit log failure should not block the main flow */ }
+}
+
+async function loadAll() {
+  try {
+    const [configRows, staffRows, productRows, memberRows, saleRows, shiftRows, drawerRows, auditRows] = await Promise.all([
+      gasList('Config'), gasList('Staff'), gasList('Products'), gasList('Members'), gasList('Sales'), gasList('Shifts'), gasList('DrawerEvents'), gasList('AuditLog'),
+    ]);
+    const cfg = { ...state.config };
+    for (const r of configRows) {
+      const v = r.value;
+      if (r.key === 'tiers') {
+        try { const parsed = JSON.parse(v); if (Array.isArray(parsed) && parsed.length>0) cfg.tiers = parsed; } catch(e) {}
+        continue;
+      }
+      if (r.key === 'bundlePromotions') {
+        try { const parsed = JSON.parse(v); if (Array.isArray(parsed)) cfg.bundlePromotions = parsed; } catch(e) {}
+        continue;
+      }
+      cfg[r.key] = (v==='true'||v===true) ? true : (v==='false'||v===false) ? false : (!isNaN(parseFloat(v)) && v!=='' && ['pointsPerRM','pointValueRM'].includes(r.key)) ? parseFloat(v) : v;
+    }
+    state.config = cfg;
+    state.staff = staffRows.map(parseStaffRow);
+    state.products = productRows.map(parseProductRow);
+    state.members = memberRows.map(parseMemberRow);
+    state.sales = saleRows.map(parseSaleRow);
+    state.shifts = shiftRows.map(parseShiftRow);
+    state.drawerEvents = drawerRows.map(parseDrawerRow);
+    state.auditLog = auditRows.map(parseAuditRow);
+    state.loaded = true;
+    render();
+  } catch (e) {
+    document.getElementById('app').innerHTML = '<div class="empty"><div class="big">⚠️</div>Failed to load, please check your network connection or refresh.<br><span style="font-size:11px;color:var(--ink-soft)">'+esc(e.message||'')+'</span></div>';
+  }
+}
+async function saveConfig() {
+  const rows = Object.keys(state.config).map(key => ({ key, value: state.config[key] }));
+  await gasBulkUpsert('Config', rows);
+}
+
+
+function findStaffByBarcode(code) {
+  const c = (code||'').trim().toLowerCase();
+  if (!c) return null;
+  return state.staff.find(s => s.barcode.toLowerCase() === c) || null;
+}
+function getOpenShift() { return state.shifts.find(s => s.status === 'open') || null; }
+
+// ============ Global scan buffer (avoids the virtual keyboard popping up and covering the screen) ============
+// How it works: instead of focusing a real input, we listen for keyboard events in the background (a barcode scanner is essentially a keyboard typing fast + Enter),
+// so with no input "selected", Android won't pop up the virtual keyboard. We switch to a real input only for manual typing.
+const LIVE_SEARCH_CONTEXTS = { memberSearch: 'memberListSearch', productSearch: 'productSearch', salesSearch: 'recSearchQuery' };
+document.addEventListener('keydown', function(e) {
+  const ctx = state.activeScanContext;
+  if (!ctx) return;
+  if (state.manualEntryContext === ctx) return; // in manual mode, let the real input handle it itself
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.id && !ae.id.startsWith('manual-')) {
+    return; // user is typing in another normal field (e.g. the add-member form), don't steal keystrokes
+  }
+  // search-type contexts: every keystroke updates the search results live, no need to wait for Enter (a barcode scan also applies instantly, so scanning still works)
+  if (LIVE_SEARCH_CONTEXTS[ctx]) {
+    const key = LIVE_SEARCH_CONTEXTS[ctx];
+    if (e.key === 'Enter') { e.preventDefault(); return; }
+    if (e.key === 'Backspace') { state[key] = (state[key]||'').slice(0,-1); }
+    else if (e.key.length === 1) { state[key] = (state[key]||'') + e.key; }
+    else { return; }
+    if (key === 'productSearch') state.productPage = 0;
+    if (key === 'memberListSearch') state.memberPage = 0;
+    if (key === 'recSearchQuery') state.salesPage = 0;
+    renderTab();
+    return;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = state.scanBuffers[ctx] || '';
+    state.scanBuffers[ctx] = '';
+    const disp = document.getElementById('scan-display-'+ctx);
+    if (disp) disp.innerHTML = '<span class="scan-placeholder">Waiting for scan…</span>';
+    handleScanSubmit(ctx, val);
+    return;
+  }
+  if (e.key === 'Backspace') {
+    state.scanBuffers[ctx] = (state.scanBuffers[ctx]||'').slice(0,-1);
+  } else if (e.key.length === 1) {
+    state.scanBuffers[ctx] = (state.scanBuffers[ctx]||'') + e.key;
+  } else {
+    return;
+  }
+  const disp = document.getElementById('scan-display-'+ctx);
+  if (disp) disp.textContent = STAFF_BARCODE_CONTEXTS.includes(ctx) ? '•'.repeat((state.scanBuffers[ctx]||'').length) : (state.scanBuffers[ctx] || '');
+});
+
+function handleScanSubmit(ctx, val) {
+  if (ctx === 'product') { handleScan(val); return; }
+  if (ctx === 'gate') { submitOpenShiftStaff(val); return; }
+  if (ctx === 'login') { submitLogin(val); return; }
+  if (ctx === 'drawer') { submitDrawerOpen(val); return; }
+  if (ctx === 'close') { const s = getOpenShift(); submitCloseShift(s ? s.id : null, val); return; }
+  if (ctx === 'editAuth') { submitEditAuth(val); return; }
+  if (ctx === 'returnAuth') { submitReturnAuth(val); return; }
+  if (ctx === 'commissionAuth') { submitCommissionAuth(val); return; }
+  if (ctx === 'auditLogAuth') { submitAuditLogAuth(val); return; }
+  if (ctx === 'settingsAuth') { submitSettingsAuth(val); return; }
+}
+
+const STAFF_BARCODE_CONTEXTS = ['login','gate','editAuth','returnAuth','settingsAuth','commissionAuth','auditLogAuth','drawer','close'];
+function renderScanField(context, placeholder, large) {
+  const isManual = state.manualEntryContext === context;
+  const buffer = state.scanBuffers[context] || '';
+  const cls = large ? 'scan-input-lg' : '';
+  const masked = STAFF_BARCODE_CONTEXTS.includes(context);
+  if (isManual) {
+    return `<div class="scan-input-wrap">
+      <input id="manual-${context}" class="${cls}" type="${masked?'password':'text'}" placeholder="${esc(placeholder||'')}" autocomplete="off" value="${esc(buffer)}"
+        oninput="state.scanBuffers['${context}']=this.value"
+        onkeydown="if(event.key==='Enter'){event.preventDefault(); finishManualEntry('${context}');}">
+      <button type="button" class="kb-btn" onclick="finishManualEntry('${context}')">✓</button>
+    </div>`;
+  }
+  const displayContent = buffer ? (masked ? '•'.repeat(buffer.length) : esc(buffer)) : `<span class="scan-placeholder">${esc(placeholder||'Waiting for scan…')}</span>`;
+  return `<div class="scan-input-wrap">
+    <div class="scan-display ${cls}" id="scan-display-${context}">${displayContent}</div>
+    <button type="button" class="kb-btn" onclick="enableManualEntry('${context}')">⌨️</button>
+  </div>`;
+}
+function enableManualEntry(context) { state.manualEntryContext = context; renderTab(); }
+function renderLiveSearchField(context, stateKey, placeholder) {
+  const isManual = state.manualEntryContext === context;
+  const value = state[stateKey] || '';
+  if (isManual) {
+    return `<div class="scan-input-wrap">
+      <input id="manual-${context}" placeholder="${esc(placeholder||'')}" autocomplete="off" value="${esc(value)}"
+        oninput="state['${stateKey}']=this.value; ${context==='productSearch'?'state.productPage=0; ':context==='memberSearch'?'state.memberPage=0; ':context==='salesSearch'?'state.salesPage=0; ':''}renderTab(); setTimeout(()=>{ const i=document.getElementById('manual-${context}'); if(i){ i.focus(); i.selectionStart=i.selectionEnd=i.value.length; } },0);"
+        onkeydown="if(event.key==='Enter'){event.preventDefault(); state.manualEntryContext=null; renderTab();}">
+      <button type="button" class="kb-btn" onclick="state.manualEntryContext=null; renderTab();">✓</button>
+    </div>`;
+  }
+  return `<div class="scan-input-wrap">
+    <div class="scan-display" id="scan-display-${context}">${value ? esc(value) : `<span class="scan-placeholder">${esc(placeholder||'')}</span>`}</div>
+    <button type="button" class="kb-btn" onclick="enableManualEntry('${context}')">⌨️</button>
+  </div>`;
+}
+function finishManualEntry(context) {
+  const val = state.scanBuffers[context] || '';
+  state.manualEntryContext = null; state.scanBuffers[context] = '';
+  handleScanSubmit(context, val);
+}
+
+// ============ Dangerous action password confirmation (generic) ============
+function requireAdminPassword(actionKey, label) {
+  state.dangerAction = actionKey; state.dangerActionLabel = label; state.dangerPasswordInput = '';
+  renderTab();
+  setTimeout(() => { const i = document.getElementById('danger-password-input'); if (i) i.focus(); }, 0);
+}
+function cancelDangerAction() { state.dangerAction = null; state.dangerPasswordInput = ''; renderTab(); }
+function renderDangerModal() {
+  if (!state.dangerAction) return '';
+  return `<div class="modal-backdrop" onclick="if(event.target===this) cancelDangerAction()">
+    <div class="modal">
+      <h2 style="margin-top:0;color:var(--danger)">⚠️ ${esc(state.dangerActionLabel)}</h2>
+      <p class="hint">This action cannot be undone. Please enter the admin password to confirm。</p>
+      <div class="field">
+        <input id="danger-password-input" type="password" placeholder="Admin password" value="${esc(state.dangerPasswordInput)}"
+          oninput="state.dangerPasswordInput=this.value"
+          onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmDangerAction();}">
+      </div>
+      <button class="btn btn-danger-solid btn-full" onclick="confirmDangerAction()">Confirm</button>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="cancelDangerAction()">Cancel</button>
+    </div>
+  </div>`;
+}
+async function confirmDangerAction() {
+  const input = document.getElementById('danger-password-input');
+  const pw = input ? input.value : state.dangerPasswordInput;
+  if (pw !== state.config.adminPassword) { showToast('Incorrect password', true); return; }
+  const action = state.dangerAction;
+  state.dangerAction = null; state.dangerPasswordInput = '';
+  if (action === 'clearMembers') await doClearAllMembers();
+  else if (action === 'clearSales') await doClearAllSales();
+  else if (action === 'clearProducts') await doClearAllProducts();
+  else renderTab();
+}
+function clearAllSales() { requireAdminPassword('clearSales', 'Clear All Sales Records'); }
+async function doClearAllSales() {
+  const backup = state.sales;
+  state.sales = [];
+  renderTab();
+  try { await gasClearSheet('Sales'); showToast('All sales records cleared ✓'); }
+  catch(e) { state.sales = backup; showToast('Clear failed, please try again', true); renderTab(); }
+}
+function clearAllMembers() { requireAdminPassword('clearMembers', 'Clear All Members'); }
+async function doClearAllMembers() {
+  const backup = state.members;
+  state.members = [];
+  renderTab();
+  try { await gasClearSheet('Members'); showToast('All members cleared ✓'); }
+  catch(e) { state.members = backup; showToast('Clear failed, please try again', true); renderTab(); }
+}
+function clearAllProducts() { requireAdminPassword('clearProducts', 'Clear All Products'); }
+async function doClearAllProducts() {
+  const backup = state.products;
+  state.products = [];
+  renderTab();
+  try { await gasClearSheet('Products'); showToast('All products cleared ✓'); }
+  catch(e) { state.products = backup; showToast('Clear failed, please try again', true); renderTab(); }
+}
+
+function resetIdleTimer() {
+  if (state.idleTimer) clearTimeout(state.idleTimer);
+  if (state.currentStaff) {
+    state.idleTimer = setTimeout(() => {
+      state.currentStaff = null; state.cart = []; state.selectedMember = null; state.redeemPoints = 0;
+      showToast('Idle timeout, automatically logged out');
+      render();
+    }, 5*60*1000);
+  }
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (!state.loaded) { app.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>Loading POS system…</div>'; return; }
+  const openShift = getOpenShift();
+  app.innerHTML = `
+    <div class="header">
+      <div>
+        <div class="brand">${esc(state.config.shopName)} <span>POS</span></div>
+        <div class="subline">${openShift ? `<span class="shift-pill">● Shift in progress · Opened at ${fmtDateTime(openShift.openedAt)}</span>` : `<span class="shift-pill closed">○ Not Open Shift</span>`}</div>
+      </div>
+      ${state.currentStaff ? `<div class="staff-pill">👤 ${esc(state.currentStaff.name)}<button onclick="manualLogout()">×</button></div>` : ''}
+    </div>
+    <div class="tabs">
+      ${tabBtn('pos','POS')}
+      ${tabBtn('members','Member')}
+      ${tabBtn('products','Products')}
+      ${tabBtn('records','Records')}
+      ${tabBtn('shifts','Shifts')}
+      ${tabBtn('settings','Settings')}
+    </div>
+    <div id="tab-content"></div>
+  `;
+  renderTab();
+}
+function tabBtn(key,label){ return `<button class="tab-btn ${state.tab===key?'active':''}" onclick="setTab('${key}')">${label}</button>`; }
+function setTab(key){
+  if (state.tab==='records' && key!=='records') { state.commissionAuthStaff = null; state.auditLogAuthStaff = null; }
+  if (state.tab==='settings' && key!=='settings') { state.settingsAuthStaff = null; state.settingsPasswordFallback = false; }
+  state.tab = key; render();
+}
+function computeActiveScanContext() {
+  if (state.editAuthOpen) return 'editAuth';
+  if (state.returnAuthOpen) return 'returnAuth';
+  if (state.tab === 'records' && state.recordsSubTab === 'commission' && !state.commissionAuthStaff) return 'commissionAuth';
+  if (state.tab === 'records' && state.recordsSubTab === 'audit' && !state.auditLogAuthStaff) return 'auditLogAuth';
+  if (state.tab === 'records' && state.recordsSubTab === 'sales') return 'salesSearch';
+  if (state.tab === 'settings' && !state.settingsAuthStaff) return 'settingsAuth';
+  if (state.tab === 'members') return 'memberSearch';
+  if (state.tab === 'products') return 'productSearch';
+  if (state.tab !== 'pos') return null;
+  if (state.closeShiftModalOpen) return 'close';
+  if (state.drawerModalOpen) return 'drawer';
+  const openShift = getOpenShift();
+  if (!openShift) return 'gate';
+  if (!state.currentStaff) return 'login';
+  return 'product';
+}
+function renderTab() {
+  state.activeScanContext = computeActiveScanContext();
+  const el = document.getElementById('tab-content');
+  if (state.tab === 'pos') el.innerHTML = renderPos();
+  if (state.tab === 'members') el.innerHTML = renderMembers();
+  if (state.tab === 'products') el.innerHTML = renderProducts();
+  if (state.tab === 'records') el.innerHTML = renderRecords();
+  if (state.tab === 'shifts') el.innerHTML = renderShifts();
+  if (state.tab === 'settings') el.innerHTML = renderSettings();
+  afterRender();
+}
+function afterRender() {
+  if (state.tab === 'pos') {
+    const openShift = getOpenShift();
+    if (openShift && state.currentStaff) {
+      const memberSearchInput = document.getElementById('member-search-input');
+      if (memberSearchInput) {
+        memberSearchInput.oninput = () => {
+          state.memberSearch = memberSearchInput.value;
+          renderTab();
+          const m = document.getElementById('member-search-input');
+          if (m) { m.focus(); m.selectionStart = m.selectionEnd = m.value.length; }
+        };
+      }
+      resetIdleTimer();
+      document.getElementById('tab-content').onclick = resetIdleTimer;
+    }
+    // if manual entry mode is active for the current context, auto-focus that field to bring up the keyboard
+    if (state.manualEntryContext) {
+      const mi = document.getElementById('manual-'+state.manualEntryContext);
+      if (mi) { mi.focus(); mi.selectionStart = mi.selectionEnd = mi.value.length; }
+    }
+  }
+  if (state.tab === 'records') {
+    const s = document.getElementById('rec-staff-filter'); if (s) s.onchange = () => { state.recFilterStaff = s.value; state.salesPage = 0; renderTab(); };
+    const d = document.getElementById('rec-date-filter'); if (d) d.onchange = () => { state.recFilterDate = d.value; state.salesPage = 0; renderTab(); };
+  }
+}
+
+// ============ POS STATE MACHINE ============
+function renderPos() {
+  const openShift = getOpenShift();
+  if (!openShift) return renderOpenShiftGate();
+  if (!state.currentStaff) return renderLoginGate(openShift);
+  return renderCheckout(openShift);
+}
+
+// ---- Open Shift Gate ----
+function renderOpenShiftGate() {
+  if (state.staff.length === 0) return `<div class="card"><div class="empty"><div class="big">👥</div>No staff registered yet.<br>Go to the "Settings" tab to add staff and work card barcodes first.</div></div>`;
+  return `
+    <div class="gate-wrap">
+      <div class="gate-icon">🌅</div>
+      <div class="gate-title">Open Shift Open Shift</div>
+      <div class="gate-sub">Scan a staff card to start today's shift</div>
+      <div class="card">
+        <div class="field"><label>Scan / Enter work card number</label>${renderScanField('gate','Scan barcode',true)}</div>
+        <div class="field"><label>Starting Cash (RM)</label><input id="gate-cash" type="number" step="0.01" min="0" placeholder="e.g. 200.00"></div>
+        <button class="btn btn-primary btn-full btn-lg" onclick="submitOpenShiftStaff(state.scanBuffers.gate)">Open Shift</button>
+      </div>
+    </div>
+  `;
+}
+async function submitOpenShiftStaff(barcode) {
+  const cashVal = parseFloat(document.getElementById('gate-cash').value);
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  if (isNaN(cashVal) || cashVal < 0) return showToast('Please enter a valid starting cash amount', true);
+  const shift = { id: 'shift_'+Date.now(), openedBy: staff.id, openedByName: staff.name, openedAt: new Date().toISOString(), startingCash: cashVal, status: 'open' };
+  state.shifts.push(shift);
+  state.scanBuffers.gate = '';
+  try { await gasUpsert('Shifts', shiftToRow(shift)); showToast('Shift opened ✓ '+staff.name); renderTab(); render(); }
+  catch(e) { state.shifts.pop(); showToast('Save failed', true); }
+}
+
+// ---- Login Gate ----
+function renderLoginGate(openShift) {
+  return `
+    <div class="gate-wrap">
+      <div class="gate-icon">🔑</div>
+      <div class="gate-title">Staff Login</div>
+      <div class="gate-sub">Scan a work card to start this transaction</div>
+      <div class="card">
+        <div class="field">${renderScanField('login','Scan barcode',true)}</div>
+        <button class="btn btn-primary btn-full btn-lg" onclick="submitLogin(state.scanBuffers.login)">Log In</button>
+      </div>
+      <div class="gate-links">
+        <a onclick="openDrawerModal()">🔓 Open Drawer</a>
+        <a onclick="openCloseShiftModal()">🌙 Close Shift</a>
+      </div>
+      ${renderDrawerModal()}
+      ${renderCloseShiftModal(openShift)}
+    </div>
+  `;
+}
+function submitLogin(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  state.scanBuffers.login = '';
+  state.currentStaff = staff; state.cart = []; state.selectedMember = null; state.redeemPoints = 0; state.payMethod = 'Cash'; state.cashTendered = null; state.paymentLines = []; state.manualDiscount = { type:'amount', value:0, note:'' }; state.itemDiscountModalSku = null; state.discountModalOpen = false;
+  render();
+}
+function manualLogout() {
+  state.currentStaff = null; state.cart = []; state.selectedMember = null; state.redeemPoints = 0;
+  if (state.idleTimer) clearTimeout(state.idleTimer);
+  render();
+}
+
+// ---- Drawer modal (non-transaction open) ----
+function neutralizeFocus() {
+  setTimeout(() => {
+    const ae = document.activeElement;
+    if (ae && typeof ae.blur === 'function' && ae !== document.body) ae.blur();
+  }, 0);
+}
+function openDrawerModal() { state.drawerModalOpen = true; renderTab(); neutralizeFocus(); }
+function closeDrawerModal() { state.drawerModalOpen = false; state.scanBuffers.drawer = ''; renderTab(); }
+function renderDrawerModal() {
+  if (!state.drawerModalOpen) return '';
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeDrawerModal()">
+    <div class="modal">
+      <h2 style="margin-top:0">🔓 Open Drawer</h2>
+      <p class="hint">Opening the drawer outside a transaction requires a staff card scan, and will be recorded and flagged red in reports。</p>
+      <div class="field">${renderScanField('drawer','Scan barcode',true)}</div>
+      <button class="btn btn-primary btn-full" onclick="submitDrawerOpen(state.scanBuffers.drawer)">Confirm Open Drawer</button>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeDrawerModal()">Cancel</button>
+    </div>
+  </div>`;
+}
+async function submitDrawerOpen(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  const openShift = getOpenShift();
+  const ev = { id:'dr_'+Date.now(), timestamp: new Date().toISOString(), staffId: staff.id, staffName: staff.name, shiftId: openShift ? openShift.id : null };
+  state.drawerEvents.push(ev);
+  state.scanBuffers.drawer = '';
+  try {
+    await gasUpsert('DrawerEvents', drawerToRow(ev));
+    printDrawerOpenSlip(staff, ev.timestamp, openShift);
+    showToast('Cash drawer open recorded · '+staff.name);
+    state.drawerModalOpen = false; renderTab();
+  } catch(e) { state.drawerEvents.pop(); showToast('Save failed', true); }
+}
+function printDrawerOpenSlip(staff, timestamp, openShift) {
+  // Before opening the drawer standalone, generate a minimal receipt slip first, so the print channel isn't sending completely blank content (which could mean the drawer-open command doesn't get sent along with it)
+  // The content shows the drawer's current "expected cash" amount, handy for an on-the-spot check — more useful than printing a plain line of text
+  const w58 = state.config.paperWidth === '58';
+  let expectedCash = null;
+  if (openShift) { const totals = computeShiftTotals(openShift.id); expectedCash = openShift.startingCash + totals.cash; }
+  const html = `
+    <div class="receipt-paper ${w58?'w58':''}">
+      <div class="rc-title">${esc(state.config.shopName)}</div>
+      <div class="rc-sub">Non-Transaction Cash Drawer · CASH DRAWER</div>
+      <hr>
+      <div class="rc-line"><div>Operator</div><div>${esc(staff.name)}</div></div>
+      <div class="rc-line"><div>Time</div><div>${fmtDateTime(timestamp)}</div></div>
+      ${expectedCash!=null ? `<div class="rc-line rc-total"><div>Expected Cash</div><div>${money(expectedCash)}</div></div>` : `<div class="rc-line"><div>Expected Cash</div><div>No shift in progress</div></div>`}
+      <hr>
+    </div>`;
+  const el = document.getElementById('receipt-print');
+  if (el) el.innerHTML = html;
+  openDrawerViaIminOrBrowser();
+}
+// ============ iMin SDK integration (Falcon) ============
+// Detect whether this device has the iMin print SDK (IminPrintInstance). This global object exists when the Falcon print plugin / H5 print environment is present.
+// Otherwise (e.g. testing on a Laptop / regular browser) automatically fall back to standard window.print().
+function hasIminSDK() { return typeof window.IminPrintInstance !== 'undefined'; }
+function checkIminSdkDiagnostic() {
+  const el = document.getElementById('imin-diagnostic-result');
+  if (!el) return;
+  const exists = hasIminSDK();
+  if (!exists) {
+    el.innerHTML = `<div class="hint" style="color:var(--danger);font-weight:700">❌ window.IminPrintInstance does not exist (undefined)</div><p class="hint">This means this page currently has no access to the native iMin print SDK — printing and opening the drawer are both done by borrowing the browser's print channel.</p>`;
+    return;
+  }
+  const P = window.IminPrintInstance;
+  const methods = ['initPrinter','setPageFormat','setTextWidth','setAlignment','setTextSize','setTextStyle','printText','printColumnsText','openCashBox','partialCut'];
+  const found = methods.filter(m => typeof P[m] === 'function');
+  const missing = methods.filter(m => typeof P[m] !== 'function');
+  el.innerHTML = `<div class="hint" style="color:var(--teal-deep);font-weight:700">✅ window.IminPrintInstance  exists!</div>
+    <p class="hint">Methods found (${found.length}/${methods.length}): ${found.join('、')||'None'}</p>
+    ${missing.length>0?`<p class="hint" style="color:var(--danger)">Missing methods: ${missing.join('、')}</p>`:''}`;
+}
+
+function ensurePrintPageSize() {
+  // Tells the browser this print job's actual paper width (80mm or 58mm); otherwise the browser defaults to A4/Letter sizing,
+  // which causes our configured receipt width to mismatch the browser's idea of page width and content gets clipped.
+  const mm = state.config.paperWidth === '58' ? '58mm' : '80mm';
+  let styleEl = document.getElementById('print-page-size-style');
+  if (!styleEl) { styleEl = document.createElement('style'); styleEl.id = 'print-page-size-style'; document.head.appendChild(styleEl); }
+  styleEl.textContent = `@page { size: ${mm} auto; margin: 0; }`;
+}
+function printReceiptViaIminOrBrowser(sale, isReprint) {
+  if (state.printingInProgress) return; // prevent rapid repeated clicks from causing duplicate prints / being merged into multiple pages
+  state.printingInProgress = true;
+  setTimeout(() => { state.printingInProgress = false; }, 2000);
+  if (hasIminSDK()) {
+    try {
+      printReceiptViaImin(sale, isReprint);
+      return;
+    } catch (e) {
+      console.warn('iMin print failed, falling back to browser print', e);
+    }
+  }
+  // Standard browser print (Laptop + Xprinter path, or a safe fallback when the iMin SDK isn't ready)
+  // Force-hide #app directly with JS (not relying on @media print CSS, since this Android print path may not apply those rules,
+  // and instead takes a "snapshot" of the whole current screen and paginates it, so the background content's height affects the page count).
+  ensurePrintPageSize();
+  const appEl = document.getElementById('app');
+  const prevDisplay = appEl ? appEl.style.display : '';
+  if (appEl) appEl.style.display = 'none';
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { if (appEl) appEl.style.display = prevDisplay; }, 800);
+  }, 200);
+}
+
+function printReceiptViaImin(sale, isReprint) {
+  // Call sequence corrected against the official JSPrinterSDK docs (https://oss-sg.imin.sg/docs/en/JSPrinterSDK.html).
+  // This has been corrected against the official docs but not tested on a real device — numbers like character width (colTotal) may need on-site tuning.
+  const P = window.IminPrintInstance;
+  const baseTitle = sale.type==='exchange' ? 'Exchange Receipt' : sale.type==='return' ? 'Refund Receipt' : 'Receipt';
+  const docTitle = isReprint ? 'Reprint ' + baseTitle : baseTitle;
+  const w58 = state.config.paperWidth === '58';
+  const lineWidth = w58 ? 384 : 576; // Per official docs: 80mm effective print width is 576 dots, 58mm is 384 dots
+  const colTotal = w58 ? 32 : 42; // Rough characters-per-line capacity (in English-character units, each Chinese character counts as 2) — may need tuning on a real device
+  const setAlign = (a) => { if (P.setAlignment) P.setAlignment(a); };
+  const setBold = (b) => { if (P.setTextStyle) P.setTextStyle(b ? 1 : 0); };
+  const setSize = (s) => { if (P.setTextSize) P.setTextSize(s); };
+  const printTwoCol = (left, right) => { if (P.printColumnsText) P.printColumnsText([left, right], [colTotal-10, 10], [0,2], [24,24], lineWidth); };
+  try {
+    if (P.initPrinter) P.initPrinter();
+    if (P.setPageFormat) P.setPageFormat(w58 ? 1 : 0);
+    if (P.setTextWidth) P.setTextWidth(lineWidth);
+
+    setAlign(1); setBold(true); setSize(32);
+    if (P.printText) P.printText(state.config.shopName + '\n');
+    setSize(24);
+    if (P.printText) P.printText(docTitle + '\n');
+    setBold(false); setSize(22);
+    if (state.config.addressLine1 && P.printText) P.printText(state.config.addressLine1 + '\n');
+    if (state.config.addressLine2 && P.printText) P.printText(state.config.addressLine2 + '\n');
+    if (state.config.addressLine3 && P.printText) P.printText(state.config.addressLine3 + '\n');
+    if (state.config.phone && P.printText) P.printText('Tel: ' + state.config.phone + '\n');
+
+    setAlign(0); setSize(24);
+    if (P.printText) P.printText('Receipt no. : ' + (sale.transactionNumber||'') + '\n');
+    if (P.printText) P.printText('Date : ' + fmtDateTimeWithYear(sale.timestamp) + '\n');
+    if (P.printText) P.printText('Cashier : ' + sale.cashier + '\n');
+    if (sale.memberName && P.printText) P.printText('Member : ' + sale.memberName + '\n');
+    if (P.printText) P.printText('--------------------------------\n');
+    for (const it of sale.items) {
+      setBold(true);
+      if (P.printText) P.printText(it.name + (it.promo?' (Promo)':'') + '\n');
+      setBold(false); setSize(20);
+      if (P.printText) P.printText('  ' + it.sku + '\n');
+      setSize(24);
+      printTwoCol(`${it.qty} x ${money(it.unitPrice)}`, money(it.qty*it.unitPrice));
+    }
+    if (P.printText) P.printText('--------------------------------\n');
+    printTwoCol('Subtotal', money(sale.subtotal));
+    if (sale.manualDiscountAmount>0) printTwoCol('Discount', '-'+money(sale.manualDiscountAmount));
+    if (sale.discount>0) printTwoCol('Points Discount', '-'+money(sale.discount));
+    if (sale.cashRoundingAdj!==0) printTwoCol('Rounding', (sale.cashRoundingAdj>0?'+':'')+money(sale.cashRoundingAdj));
+    if (P.printText) P.printText('\n');
+    setAlign(1); setBold(true); setSize(30);
+    if (P.printText) P.printText('TOTAL ' + money(sale.total) + '\n');
+    setBold(false); setSize(24); setAlign(0);
+    for (const p of (sale.payments||[])) printTwoCol(p.method, money(p.amount));
+    if (sale.cashTendered!=null) { printTwoCol('Cash Tendered', money(sale.cashTendered)); printTwoCol('Change', money(sale.changeGiven)); }
+    if (sale.memberName) printTwoCol('Points Earned', '+'+sale.pointsEarned);
+    setAlign(1);
+    if (P.printText) P.printText('\nThank You and please come again!\n');
+    setSize(18);
+    if (P.printText) P.printText('We are happy to replace or exchange products return within 3 days from the purchase date as long as it\'s returned in it\'s original packaging, unused, sellable condition and in good time. No cash refund.\n\n\n');
+    if (P.partialCut) P.partialCut();
+  } catch (e) {
+    console.warn('iMin printer call error', e);
+    ensurePrintPageSize();
+    setTimeout(() => window.print(), 200);
+  }
+}
+
+function openDrawerViaIminOrBrowser() {
+  if (hasIminSDK() && window.IminPrintInstance.openCashBox) {
+    try { window.IminPrintInstance.openCashBox(); return; } catch (e) { console.warn('iMin open drawer failed', e); }
+  }
+  // Without the iMin SDK (Laptop + Xprinter path), fall back to trying the print channel to trigger it (whether it actually opens needs on-site testing)
+  ensurePrintPageSize();
+  try { window.print(); } catch(e) {}
+}
+
+
+// ---- Close Shift modal ----
+function openCloseShiftModal() { state.closeShiftModalOpen = true; renderTab(); neutralizeFocus(); }
+function closeCloseShiftModal() { state.closeShiftModalOpen = false; state.scanBuffers.close = ''; renderTab(); }
+function computeShiftTotals(shiftId) {
+  const salesInShift = state.sales.filter(s => s.shiftId === shiftId);
+  const totals = { cash:0, creditCard:0, debitCard:0, ewallet:0, storeCredit:0, total:0, count: salesInShift.length };
+  for (const s of salesInShift) {
+    totals.total += s.total;
+    const pays = (s.payments && s.payments.length) ? s.payments : [{ method: s.payMethod, amount: s.total }];
+    for (const p of pays) {
+      if (p.method==='Cash') totals.cash += p.amount;
+      else if (p.method==='Credit Card') totals.creditCard += p.amount;
+      else if (p.method==='Debit Card') totals.debitCard += p.amount;
+      else if (p.method==='E-wallet') totals.ewallet += p.amount;
+      else if (p.method==='Store Credit') totals.storeCredit += p.amount;
+    }
+  }
+  return totals;
+}
+function renderCloseShiftModal(openShift) {
+  if (!state.closeShiftModalOpen || !openShift) return '';
+  const totals = computeShiftTotals(openShift.id);
+  const expectedCash = openShift.startingCash + totals.cash;
+  const drawerEvents = state.drawerEvents.filter(e => e.shiftId === openShift.id);
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeCloseShiftModal()">
+    <div class="modal">
+      <h2 style="margin-top:0">🌙 Close Shift</h2>
+      <p class="hint">Scan staff card to authorize shift close,Enter the actual counted cash amount。</p>
+      <div class="summary-row"><div>Sales Count</div><div class="val">${totals.count}</div></div>
+      <div class="summary-row"><div>Cash</div><div class="val">${money(totals.cash)}</div></div>
+      <div class="summary-row"><div>Credit Card</div><div class="val">${money(totals.creditCard)}</div></div>
+      <div class="summary-row"><div>Debit Card</div><div class="val">${money(totals.debitCard)}</div></div>
+      <div class="summary-row"><div>E-wallet</div><div class="val">${money(totals.ewallet)}</div></div>
+      <div class="summary-row"><div>Store Credit</div><div class="val">${money(totals.storeCredit)}</div></div>
+      <div class="summary-row total"><div>Total Sales</div><div class="val">${money(totals.total)}</div></div>
+      <div class="section-title">Cash Reconciliation</div>
+      <div class="summary-row"><div>Starting Cash</div><div class="val">${money(openShift.startingCash)}</div></div>
+      <div class="summary-row"><div>+ Cash Sales</div><div class="val">${money(totals.cash)}</div></div>
+      <div class="summary-row" style="font-weight:800"><div>Expected Cash</div><div class="val">${money(expectedCash)}</div></div>
+      ${drawerEvents.length>0 ? `<p class="hint" style="color:var(--danger)">⚠ This shift has ${drawerEvents.length} non-transaction cash-drawer openings; you can review them in shift details after closing。</p>` : ''}
+      <div class="field" style="margin-top:10px"><label>Actual Counted Cash (RM)</label><input id="close-actual-cash" type="number" step="0.01" min="0" placeholder="Enter after counting"></div>
+      <div class="field"><label>Scan work card to authorize shift close</label>${renderScanField('close','Scan barcode',true)}</div>
+      <button class="btn btn-danger-solid btn-full" onclick="submitCloseShift('${escAttr(openShift.id)}', state.scanBuffers.close)">Confirm Close Shift</button>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeCloseShiftModal()">Cancel</button>
+    </div>
+  </div>`;
+}
+async function submitCloseShift(shiftId, barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  const actualCash = parseFloat(document.getElementById('close-actual-cash').value);
+  if (isNaN(actualCash) || actualCash < 0) return showToast('Please enter the actual counted cash', true);
+  const shift = state.shifts.find(s => s.id === shiftId);
+  if (!shift) return;
+  const totals = computeShiftTotals(shiftId);
+  const expectedCash = shift.startingCash + totals.cash;
+  const variance = actualCash - expectedCash;
+  const prev = { ...shift };
+  shift.status = 'closed'; shift.closedBy = staff.id; shift.closedByName = staff.name; shift.closedAt = new Date().toISOString();
+  shift.actualCash = actualCash; shift.expectedCash = expectedCash; shift.variance = variance; shift.totals = totals;
+  state.scanBuffers.close = '';
+  try {
+    await gasUpsert('Shifts', shiftToRow(shift));
+    showToast('Shift closed ✓ Variance ' + (variance>=0?'+':'') + money(variance));
+    state.closeShiftModalOpen = false; state.currentStaff = null; state.tab='shifts'; state.shiftDetailId = shift.id;
+    render();
+  } catch(e) { Object.assign(shift, prev); showToast('Save failed', true); }
+}
+
+// ============ CHECKOUT ============
+function activePrice(p) { return (p.promoActive && p.promoPrice != null && p.promoPrice !== '') ? Number(p.promoPrice) : Number(p.price); }
+function handleScan(val) {
+  const v = (val||'').trim(); if (!v) return;
+  const vLower = v.toLowerCase();
+  const p = state.products.find(pr => (pr.barcodes||[]).some(b=>b.toLowerCase()===vLower) || pr.sku.toLowerCase()===vLower);
+  if (!p) { showToast('SKU / Barcode not found: '+v, true); return; }
+  addToCart(p.sku);
+}
+function addToCart(sku) {
+  const p = state.products.find(pr => pr.sku === sku); if (!p) return;
+  const existing = state.cart.find(c => c.sku === sku);
+  if (existing) existing.qty += 1;
+  else state.cart.push({ sku:p.sku, name:p.name, brand:p.brand, price:Number(p.price), promoActive: !!p.promoActive, promoPrice: p.promoPrice!=null?Number(p.promoPrice): null, commission: Number(p.commission)||0, commissionType: p.commissionType||'fixed', qty:1, discountType:'amount', discountValue:0, discountNote:'',
+    bundleQty: Number(p.bundleQty)||0, bundleDiscountType: p.bundleDiscountType||'amount', bundleDiscountValue: Number(p.bundleDiscountValue)||0 });
+  renderTab(); resetIdleTimer();
+}
+function changeQty(sku, delta) {
+  const item = state.cart.find(c => c.sku === sku); if (!item) return;
+  item.qty += delta; if (item.qty <= 0) state.cart = state.cart.filter(c => c.sku !== sku);
+  renderTab(); resetIdleTimer();
+}
+function removeFromCart(sku) { state.cart = state.cart.filter(c => c.sku !== sku); renderTab(); resetIdleTimer(); }
+function clearCart() { state.cart = []; state.selectedMember = null; state.redeemPoints = 0; state.cashTendered = null; state.paymentLines = []; state.manualDiscount = { type:'amount', value:0, note:'' }; state.itemDiscountModalSku = null; state.discountModalOpen = false; renderTab(); resetIdleTimer(); }
+function cartItemPromoApplies(c) { return !!(c.promoActive && c.promoPrice!=null && state.selectedMember); }
+function cartSubtotal() { return state.cart.reduce((sum,c) => sum + itemUnitPrice(c) * c.qty, 0); }
+function itemBaseLineTotal(c) { return itemUnitPrice(c) * c.qty; }
+function itemUnitPrice(c) { return cartItemPromoApplies(c) ? c.promoPrice : c.price; }
+function bundleDiscountAmount(c) {
+  if (!c.bundleQty || c.bundleQty <= 0 || !c.bundleDiscountValue) return 0;
+  const sets = Math.floor(c.qty / c.bundleQty);
+  if (sets <= 0) return 0;
+  const unitPrice = itemUnitPrice(c);
+  const perSetValue = c.bundleDiscountType === 'percent'
+    ? round2(unitPrice * c.bundleQty * c.bundleDiscountValue / 100)
+    : c.bundleDiscountValue;
+  return Math.min(itemBaseLineTotal(c), round2(perSetValue * sets));
+}
+function itemDiscountAmount(c) {
+  if (!c.discountValue) return 0;
+  const base = itemBaseLineTotal(c);
+  if (c.discountType === 'percent') return Math.min(base, round2(base * c.discountValue / 100));
+  return Math.min(base, c.discountValue);
+}
+function itemLineTotal(c) { return Math.max(0, itemBaseLineTotal(c) - bundleDiscountAmount(c) - itemDiscountAmount(c)); }
+function cartItemDiscountsTotal() { return state.cart.reduce((sum,c) => sum + itemDiscountAmount(c) + bundleDiscountAmount(c), 0); }
+function bundlePromoMatches(promo, cartItem) {
+  if (promo.matchType === 'sku') {
+    const skus = (promo.matchValues || []).map(s => s.trim().toUpperCase()).filter(Boolean);
+    return skus.includes((cartItem.sku||'').toUpperCase());
+  }
+  if (promo.matchType === 'brand') {
+    const brands = (promo.matchValues || []).map(s => s.trim().toLowerCase()).filter(Boolean);
+    return brands.includes((cartItem.brand||'').trim().toLowerCase());
+  }
+  return false;
+}
+function cartBundlePromotions() {
+  const promos = state.config.bundlePromotions || [];
+  const results = [];
+  for (const promo of promos) {
+    if (!promo.qty || promo.qty <= 0 || !promo.discountValue) continue;
+    const qualifyingItems = state.cart.filter(c => bundlePromoMatches(promo, c));
+    const totalQty = qualifyingItems.reduce((s,c) => s + c.qty, 0);
+    const sets = Math.floor(totalQty / promo.qty);
+    if (sets <= 0) continue;
+    const qualifyingSubtotal = qualifyingItems.reduce((s,c) => s + itemLineTotal(c), 0);
+    let discountAmount;
+    if (promo.discountType === 'percent') {
+      const coveredQty = sets * promo.qty;
+      const proportion = totalQty > 0 ? coveredQty / totalQty : 0;
+      discountAmount = round2(qualifyingSubtotal * proportion * (promo.discountValue/100));
+    } else {
+      discountAmount = round2(sets * promo.discountValue);
+    }
+    discountAmount = Math.min(qualifyingSubtotal, discountAmount);
+    if (discountAmount > 0) results.push({ promo, qualifyingQty: totalQty, sets, discountAmount });
+  }
+  return results;
+}
+function cartBundlePromotionsTotal() { return cartBundlePromotions().reduce((sum,r) => sum + r.discountAmount, 0); }
+function cartSubtotalAfterItemDiscounts() { return state.cart.reduce((sum,c) => sum + itemLineTotal(c), 0); }
+function itemUnitCommission(c) {
+  const unitPrice = itemUnitPrice(c);
+  return c.commissionType === 'percent' ? unitPrice * (c.commission||0) / 100 : (c.commission||0);
+}
+function cartCommission() { return state.cart.reduce((sum,c) => sum + itemUnitCommission(c) * c.qty, 0); }
+function isEditingManager() { return state.editingStaff && state.editingStaff.role === 'manager'; }
+function tierClass(tierName) {
+  const n = (tierName||'').toLowerCase();
+  if (n.includes('platinum')) return 'platinum';
+  if (n.includes('gold')) return 'gold';
+  if (n.includes('silver')) return 'silver';
+  return 'base';
+}
+function getMemberRates(member) {
+  if (!member) return { earnRate: state.config.pointsPerRM||0, redeemRate: state.config.pointValueRM||0.1 };
+  const tier = (state.config.tiers||[]).find(t => t.name === member.tier);
+  return tier ? { earnRate: tier.earnRate, redeemRate: tier.redeemRate } : { earnRate: state.config.pointsPerRM||0, redeemRate: state.config.pointValueRM||0.1 };
+}
+function maxRedeemablePoints() {
+  if (!state.selectedMember) return 0;
+  const subtotal = cartSubtotalAfterItemDiscounts();
+  const rates = getMemberRates(state.selectedMember);
+  return Math.max(0, Math.min(state.selectedMember.points, Math.floor(subtotal / (rates.redeemRate||0.1))));
+}
+function redeemDiscount() { const rates = getMemberRates(state.selectedMember); return (state.redeemPoints||0) * (rates.redeemRate||0.1); }
+function manualDiscountAmount() {
+  const md = state.manualDiscount; if (!md || !md.value) return 0;
+  const base = cartSubtotalAfterItemDiscounts();
+  if (md.type === 'percent') return Math.min(base, round2(base * md.value / 100));
+  return Math.min(base, md.value);
+}
+function preRoundTotal() { return Math.max(0, cartSubtotalAfterItemDiscounts() - cartBundlePromotionsTotal() - redeemDiscount() - manualDiscountAmount()); }
+function roundToNearest5Cent(amt) { return Math.round(amt * 20) / 20; }
+function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+function checkoutHasCashLine() { return state.paymentLines.some(l => l.method === 'Cash'); }
+function cartTotal() { return checkoutHasCashLine() ? roundToNearest5Cent(preRoundTotal()) : preRoundTotal(); }
+function cashRoundingAdj() { return round2(cartTotal() - preRoundTotal()); }
+function paymentLinesSum() { return round2(state.paymentLines.reduce((s,l) => s + (l.amount||0), 0)); }
+function checkoutRemaining() { return Math.max(0, round2(cartTotal() - paymentLinesSum())); }
+function checkoutOverpaid() { return Math.max(0, round2(paymentLinesSum() - cartTotal())); }
+function pointsEarnedPreview() { const rates = getMemberRates(state.selectedMember); return Math.floor(cartTotal() * (rates.earnRate||0)); }
+function selectMember(id) { state.selectedMember = state.members.find(m=>m.id===id)||null; state.redeemPoints=0; state.memberSearch=''; renderTab(); resetIdleTimer(); }
+function deselectMember() { state.selectedMember = null; state.redeemPoints = 0; state.paymentLines = state.paymentLines.filter(l=>l.method!=='Store Credit'); renderTab(); resetIdleTimer(); }
+function setRedeemPoints(val) {
+  let n=parseInt(val,10); if(isNaN(n)||n<0) n=0; const max=maxRedeemablePoints(); if(n>max) n=max;
+  state.redeemPoints=n; renderTab(); resetIdleTimer();
+  setTimeout(()=>{ const i=document.getElementById('redeem-points-input'); if(i){ i.focus(); i.selectionStart=i.selectionEnd=i.value.length; } },0);
+}
+function setManualDiscountType(type) { state.manualDiscount.type = type; renderTab(); resetIdleTimer(); }
+function setManualDiscountValue(val) {
+  let n = parseFloat(val); if (isNaN(n) || n < 0) n = 0;
+  state.manualDiscount.value = n; renderTab(); resetIdleTimer();
+  setTimeout(()=>{ const i=document.getElementById('manual-discount-value'); if(i){ i.focus(); i.selectionStart=i.selectionEnd=i.value.length; } },0);
+}
+function setManualDiscountNote(val) { state.manualDiscount.note = val; }
+function clearManualDiscount() { state.manualDiscount = { type:'amount', value:0, note:'' }; renderTab(); resetIdleTimer(); }
+function openDiscountModal() { state.discountModalOpen = true; renderTab(); }
+function closeDiscountModal() { state.discountModalOpen = false; renderTab(); }
+function openItemDiscountModal(sku) { state.itemDiscountModalSku = sku; renderTab(); }
+function closeItemDiscountModal() { state.itemDiscountModalSku = null; renderTab(); }
+function setItemDiscountType(sku, type) { const it = state.cart.find(c=>c.sku===sku); if (it) { it.discountType = type; renderTab(); } }
+function setItemDiscountValue(sku, val) {
+  const it = state.cart.find(c=>c.sku===sku); if (!it) return;
+  let n = parseFloat(val); if (isNaN(n)||n<0) n = 0;
+  it.discountValue = n; renderTab();
+  setTimeout(()=>{ const i=document.getElementById('item-discount-value'); if(i){ i.focus(); i.selectionStart=i.selectionEnd=i.value.length; } },0);
+}
+function setItemDiscountNote(sku, val) { const it = state.cart.find(c=>c.sku===sku); if (it) it.discountNote = val; }
+function clearItemDiscount(sku) { const it = state.cart.find(c=>c.sku===sku); if (it) { it.discountType='amount'; it.discountValue=0; it.discountNote=''; renderTab(); } }
+function renderDiscountModal() {
+  if (!state.discountModalOpen) return '';
+  const md = state.manualDiscount;
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeDiscountModal()">
+    <div class="modal">
+      <h2 style="margin-top:0">Discount(Whole-Order Discount)</h2>
+      <div class="pay-grid" style="grid-template-columns:1fr 1fr">
+        <div class="pay-opt ${md.type==='amount'?'active':''}" onclick="setManualDiscountType('amount')">RM Amount</div>
+        <div class="pay-opt ${md.type==='percent'?'active':''}" onclick="setManualDiscountType('percent')">% Percent</div>
+      </div>
+      <div class="field">
+        <label>${md.type==='percent' ? 'Discount % (%)' : 'Discount Amount (RM)'}</label>
+        <input id="manual-discount-value" type="text" inputmode="decimal" value="${md.value||''}" placeholder="0" oninput="setManualDiscountValue(this.value.replace(/[^0-9.]/g,''))">
+      </div>
+      <div class="field">
+        <label>Reason (optional)</label>
+        <input id="manual-discount-note" type="text" value="${esc(md.note)}" placeholder="e.g. minor item defect, regular customer discount" oninput="setManualDiscountNote(this.value)">
+      </div>
+      ${manualDiscountAmount()>0 ? `<p class="hint">Discounted ${money(manualDiscountAmount())}</p>` : ''}
+      <button class="btn btn-primary btn-full" onclick="closeDiscountModal()">Done</button>
+      ${md.value>0 ? `<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearManualDiscount(); closeDiscountModal();">Clear Discount</button>` : ''}
+    </div>
+  </div>`;
+}
+function renderItemDiscountModal() {
+  if (!state.itemDiscountModalSku) return '';
+  const c = state.cart.find(x => x.sku === state.itemDiscountModalSku);
+  if (!c) return '';
+  const sku = c.sku;
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeItemDiscountModal()">
+    <div class="modal">
+      <h2 style="margin-top:0">Discount · ${esc(c.name)}</h2>
+      <p class="hint">${esc(c.sku)} · Qty ${c.qty} · Unit Price ${money(itemUnitPrice(c))}</p>
+      <div class="pay-grid" style="grid-template-columns:1fr 1fr">
+        <div class="pay-opt ${c.discountType==='amount'?'active':''}" onclick="setItemDiscountType('${escAttr(sku)}','amount')">RM Amount</div>
+        <div class="pay-opt ${c.discountType==='percent'?'active':''}" onclick="setItemDiscountType('${escAttr(sku)}','percent')">% Percent</div>
+      </div>
+      <div class="field">
+        <label>${c.discountType==='percent' ? 'Discount % (%)' : 'Discount Amount (RM, whole line)'}</label>
+        <input id="item-discount-value" type="text" inputmode="decimal" value="${c.discountValue||''}" placeholder="0" oninput="setItemDiscountValue('${escAttr(sku)}', this.value.replace(/[^0-9.]/g,''))">
+      </div>
+      <div class="field">
+        <label>Reason (optional)</label>
+        <input id="item-discount-note" type="text" value="${esc(c.discountNote||'')}" placeholder="e.g. minor item defect" oninput="setItemDiscountNote('${escAttr(sku)}', this.value)">
+      </div>
+      ${itemDiscountAmount(c)>0 ? `<p class="hint">This item has been discounted ${money(itemDiscountAmount(c))}(subtotal after discount ${money(itemLineTotal(c))})</p>` : ''}
+      <button class="btn btn-primary btn-full" onclick="closeItemDiscountModal()">Done</button>
+      ${c.discountValue>0 ? `<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearItemDiscount('${escAttr(sku)}'); closeItemDiscountModal();">Clear Discount</button>` : ''}
+    </div>
+  </div>`;
+}
+function addPaymentLine(method) {
+  const remaining = checkoutRemaining();
+  if (remaining <= 0.001) return showToast('Amount already fully paid', true);
+  let amount = remaining;
+  if (method === 'Store Credit') {
+    if (!state.selectedMember) return showToast('Please select a member first to use Store Credit', true);
+    const avail = Math.max(0, (state.selectedMember.storeCredit||0) - state.paymentLines.filter(l=>l.method==='Store Credit').reduce((s,l)=>s+l.amount,0));
+    if (avail <= 0) return showToast('This member has no available Store Credit balance', true);
+    amount = Math.min(remaining, avail);
+  }
+  state.paymentLines.push({ method, amount: round2(amount) });
+  renderTab(); resetIdleTimer();
+}
+function removePaymentLine(idx) { state.paymentLines.splice(idx,1); renderTab(); resetIdleTimer(); }
+function updatePaymentLineAmount(idx, val) {
+  const line = state.paymentLines[idx]; if (!line) return;
+  let n = parseFloat(String(val).replace(/[^0-9.]/g,'')); if (isNaN(n) || n<0) n = 0;
+  if (line.method === 'Store Credit' && state.selectedMember) {
+    const usedByOthers = state.paymentLines.filter((l,i)=>i!==idx && l.method==='Store Credit').reduce((s,l)=>s+l.amount,0);
+    n = Math.min(n, Math.max(0, (state.selectedMember.storeCredit||0) - usedByOthers));
+  }
+  line.amount = round2(n);
+  renderTab(); resetIdleTimer();
+}
+
+function renderCheckout(openShift) {
+  const cartRows = state.cart.length === 0
+    ? `<div class="empty"><div class="big">🛒</div>Cart is empty<br><span style="font-size:12px">Scan barcode or select from the product list below</span></div>`
+    : state.cart.map(c => {
+      const unitPrice = itemUnitPrice(c);
+      const promoApplies = cartItemPromoApplies(c);
+      const lineDiscount = itemDiscountAmount(c);
+      const bundleDiscount = bundleDiscountAmount(c);
+      const lineTotal = itemLineTotal(c);
+      return `<div class="cart-row">
+        <div>
+          <div class="cart-item-name"><a style="cursor:pointer;color:inherit;text-decoration:underline dotted" onclick="openItemDiscountModal('${escAttr(c.sku)}')">${esc(c.name)}</a> ${promoApplies?'<span class="badge badge-promo">Promo</span>':''} ${lineDiscount>0?'<span class="badge badge-danger">Discount</span>':''} ${bundleDiscount>0?'<span class="badge badge-teal">Bundle</span>':''}</div>
+          <div class="cart-item-sub">${esc(c.sku)} · ${esc(c.brand||'')}</div>
+          ${promoApplies ? `<div class="price-strike">${money(c.price)}</div>` : ''}
+          ${c.promoActive && c.promoPrice!=null && !state.selectedMember ? `<div class="hint" style="margin:2px 0 0">Promo price requires a member — select a member to apply it</div>` : ''}
+          ${bundleDiscount>0 ? `<div class="hint" style="margin:2px 0 0;color:var(--teal-deep)">Bundle discount −${money(bundleDiscount)} (buy ${c.bundleQty} for ${c.bundleDiscountType==='percent'?c.bundleDiscountValue+'% off':'RM'+c.bundleDiscountValue+' off'})</div>` : ''}
+          ${lineDiscount>0 ? `<div class="hint" style="margin:2px 0 0;color:var(--danger)">Discounted ${money(lineDiscount)}</div>` : ''}
+        </div>
+        <div class="qty-ctrl"><button class="qty-btn" onclick="changeQty('${escAttr(c.sku)}',-1)">−</button><div class="qty-val">${c.qty}</div><button class="qty-btn" onclick="changeQty('${escAttr(c.sku)}',1)">+</button></div>
+        <div class="num">${money(unitPrice)}</div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="num" style="min-width:64px">${lineDiscount>0?`<span class="price-strike">${money(unitPrice*c.qty)}</span> `:''}${money(lineTotal)}</div><button class="btn-danger" onclick="removeFromCart('${escAttr(c.sku)}')">×</button></div>
+      </div>`;
+    }).join('');
+
+  const filteredMembers = state.memberSearch.trim() ? state.members.filter(m => m.phone.includes(state.memberSearch.trim()) || m.name.toLowerCase().includes(state.memberSearch.trim().toLowerCase())).slice(0,6) : [];
+  const quickProducts = state.products.slice(0,12).map(p => `<div class="quick-card" onclick="addToCart('${escAttr(p.sku)}')"><div class="qn">${esc(p.name)}</div><div class="qs">${esc(p.sku)}</div><div class="qp">${money(activePrice(p))}</div></div>`).join('');
+
+  const subtotal = cartSubtotal(), discount = redeemDiscount(), total = cartTotal(), roundAdj = cashRoundingAdj();
+  const paid = paymentLinesSum(), remaining = checkoutRemaining();
+  const earnPreview = pointsEarnedPreview(), maxRedeem = maxRedeemablePoints();
+
+  return `
+  <div class="pos-grid">
+    <div>
+      <div class="card">
+        <h2>Scan / Search products</h2>
+        <div class="scan-box">
+          ${renderScanField('product','Scan with a barcode scanner, or tap ⌨️ to enter manually SKU',false)}
+          <button class="btn btn-primary" onclick="handleScanSubmit('product', state.scanBuffers.product); state.scanBuffers.product='';">Add</button>
+        </div>
+        <div class="scan-hint">💡 Logged in: ${esc(state.currentStaff.name)} · auto logout after 5 minutes idle</div>
+        ${state.products.length===0 ? `<div class="empty">No product data yet, add some on the "Products" tab first.</div>` : `<div class="quick-grid">${quickProducts}</div>`}
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Member</h2>
+        ${state.selectedMember ? `
+          <div class="member-selected">
+            <div><div class="name">${esc(state.selectedMember.name)} <span class="badge badge-tier-${tierClass(state.selectedMember.tier)}">${esc(state.selectedMember.tier||'Member')}</span></div><div class="pts">${esc(state.selectedMember.phone)} · points ${state.selectedMember.points} · Total Spend ${money(state.selectedMember.totalSpend||0)} · Store Credit ${money(state.selectedMember.storeCredit||0)}</div></div>
+            <button class="btn-danger" onclick="deselectMember()">Remove</button>
+          </div>
+          <div class="field"><label>Use points for discount (max ${maxRedeem} pts = ${money(maxRedeem*getMemberRates(state.selectedMember).redeemRate)})</label><input id="redeem-points-input" type="text" inputmode="numeric" value="${state.redeemPoints}" oninput="setRedeemPoints(this.value.replace(/[^0-9]/g,''))"></div>
+        ` : `
+          <input id="member-search-input" placeholder="Search members by phone or name" value="${esc(state.memberSearch)}">
+          ${filteredMembers.length>0 ? filteredMembers.map(m => `<div class="quick-card" style="margin-top:8px" onclick="selectMember('${escAttr(m.id)}')"><div class="qn">${esc(m.name)} <span class="badge badge-tier-${tierClass(m.tier)}" style="font-size:9px">${esc(m.tier||'Member')}</span></div><div class="qs">${esc(m.phone)} · points ${m.points}</div></div>`).join('') : (state.memberSearch.trim()?'<div class="hint" style="margin-top:8px">No matching member found</div>':'')}
+        `}
+      </div>
+
+      <div class="card"><h2>Cart</h2>${cartRows}</div>
+
+      <div class="card">
+        <h2>Payment Method</h2>
+        <div class="summary-row"><div>Subtotal</div><div class="val">${money(subtotal)}</div></div>
+        ${cartItemDiscountsTotal()>0?`<div class="summary-row"><div>Item Discount</div><div class="val">−${money(cartItemDiscountsTotal())}</div></div>`:''}
+        ${cartBundlePromotions().map(r => `<div class="summary-row"><div>🎁 ${esc(r.promo.name||'Bundle Promo')}</div><div class="val">−${money(r.discountAmount)}</div></div>`).join('')}
+        ${manualDiscountAmount()>0
+          ? `<div class="summary-row"><div>Discount${state.manualDiscount.type==='percent'?' ('+state.manualDiscount.value+'%)':''} · <a style="cursor:pointer;color:var(--teal);text-decoration:underline" onclick="openDiscountModal()">Edit</a></div><div class="val">−${money(manualDiscountAmount())}</div></div>`
+          : `<div class="summary-row"><div><a style="cursor:pointer;color:var(--teal)" onclick="openDiscountModal()">+ Add Discount</a></div><div class="val"></div></div>`}
+        ${discount>0?`<div class="summary-row"><div>Points Discount (${state.redeemPoints}pts)</div><div class="val">−${money(discount)}</div></div>`:''}
+        ${roundAdj!==0?`<div class="summary-row"><div>Cash Rounding</div><div class="val">${roundAdj>0?'+':''}${money(roundAdj)}</div></div>`:''}
+        <div class="summary-row total"><div>Total</div><div class="val">${money(total)}</div></div>
+
+        <div class="pay-grid" style="margin-top:14px">
+          <div class="pay-opt" onclick="addPaymentLine('Cash')">+ Cash</div>
+          <div class="pay-opt" onclick="addPaymentLine('Credit Card')">+ Credit Card</div>
+          <div class="pay-opt" onclick="addPaymentLine('Debit Card')">+ Debit Card</div>
+          <div class="pay-opt" onclick="addPaymentLine('E-wallet')">+ E-wallet</div>
+          ${state.selectedMember ? `<div class="pay-opt" onclick="addPaymentLine('Store Credit')">+ Store Credit</div>` : ''}
+        </div>
+
+        ${state.paymentLines.length>0 ? `
+          <div class="section-title">Payments added</div>
+          ${state.paymentLines.map((l,i) => `
+            <div class="cart-row">
+              <div class="cart-item-name">${esc(l.method)}${l.method==='Store Credit'&&state.selectedMember?`<div class="cart-item-sub">Balance ${money(state.selectedMember.storeCredit||0)}</div>`:''}</div>
+              <div><input type="text" inputmode="decimal" value="${l.amount}" style="width:88px;text-align:right;padding:6px 8px" onchange="updatePaymentLineAmount(${i}, this.value)"></div>
+              <button class="btn-danger" onclick="removePaymentLine(${i})">×</button>
+            </div>`).join('')}
+        ` : ''}
+        <div class="summary-row" style="margin-top:8px"><div>Paid</div><div class="val">${money(paid)}</div></div>
+        ${remaining>0.001 ? `<div class="summary-row" style="color:var(--danger);font-weight:800"><div>Remaining</div><div class="val">${money(remaining)}</div></div>` : ''}
+
+        <div class="hint" style="margin-top:6px">This sale's commission: ${money(cartCommission())} · attributed to ${esc(state.currentStaff.name)}${state.cart.some(c=>c.commissionType==='percent')?' (includes percentage commission, calculated on actual selling price)':''}</div>
+        ${state.selectedMember?`<div class="hint">This purchase will earn approx. ${earnPreview} points</div>`:''}
+        <button class="btn btn-primary btn-full btn-lg" style="margin-top:16px" onclick="checkout('${escAttr(openShift.id)}')" ${(state.cart.length===0 || remaining>0.001 || state.checkoutSubmitting)?'disabled':''}>${state.checkoutSubmitting?'Processing…':'Complete Checkout · '+money(total)}</button>
+        ${state.cart.length>0?`<button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="clearCart()">Clear Cart</button>`:''}
+      </div>
+    </div>
+  </div>
+  ${renderChangeModal()}
+  ${renderDiscountModal()}
+  ${renderItemDiscountModal()}`;
+}
+
+function maybeUpgradeTier(member) {
+  const tiers = [...(state.config.tiers||[])].sort((a,b)=>a.threshold-b.threshold);
+  if (tiers.length===0) return;
+  const currentRank = tiers.findIndex(t => t.name === member.tier);
+  let bestRank = currentRank;
+  for (let i=0;i<tiers.length;i++) {
+    if ((member.totalSpend||0) >= tiers[i].threshold && i > bestRank) bestRank = i;
+  }
+  if (bestRank > currentRank && bestRank >= 0) member.tier = tiers[bestRank].name;
+}
+async function checkout(shiftId) {
+  if (state.checkoutSubmitting) return; // prevent rapid repeated clicks from causing a duplicate checkout
+  if (state.cart.length===0) return showToast('Cart is empty', true);
+  if (checkoutRemaining() > 0.001) return showToast('Amount not fully paid yet', true);
+  state.checkoutSubmitting = true;
+  renderTab();
+  const subtotal = cartSubtotal(), discount = redeemDiscount(), total = cartTotal(), roundAdj = cashRoundingAdj();
+  const pointsEarned = state.selectedMember ? pointsEarnedPreview() : 0;
+  const pointsRedeemed = state.selectedMember ? state.redeemPoints : 0;
+  const commissionTotal = cartCommission();
+  const mdAmount = manualDiscountAmount();
+  const bundlePromosApplied = cartBundlePromotions();
+  const bundlePromoTotal = bundlePromosApplied.reduce((s,r)=>s+r.discountAmount,0);
+  const payments = state.paymentLines.map(l => ({ method:l.method, amount:l.amount }));
+  const hasCash = payments.some(p => p.method === 'Cash');
+  const cashTendered = hasCash ? round2(payments.filter(p=>p.method==='Cash').reduce((s,p)=>s+p.amount,0)) : null;
+  const overpaid = checkoutOverpaid();
+  const changeGiven = hasCash && overpaid > 0.001 ? overpaid : (hasCash ? 0 : null);
+  const sale = {
+    id:'sale_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), timestamp:new Date().toISOString(), shiftId, transactionNumber: generateTransactionNumber('sale'),
+    cashier: state.currentStaff.name, cashierId: state.currentStaff.id,
+    commissionStaff: state.currentStaff.name, commissionStaffId: state.currentStaff.id, commissionTotal,
+    items: state.cart.map(c => {
+      const baseUnitPrice = c.price;
+      const promoApplied = cartItemPromoApplies(c);
+      const lineDiscount = itemDiscountAmount(c);
+      const bundleDiscount = bundleDiscountAmount(c);
+      const effectiveUnitPrice = round2(itemLineTotal(c) / c.qty);
+      return { sku:c.sku, name:c.name, qty:c.qty, unitPrice: effectiveUnitPrice, originalUnitPrice: baseUnitPrice, promo: promoApplied, commission: itemUnitCommission(c),
+        discountAmount: lineDiscount, discountType: c.discountType||'amount', discountNote: c.discountNote||'', bundleDiscountAmount: bundleDiscount };
+    }),
+    subtotal, discount, cashRoundingAdj: roundAdj, total, payMethod: payments[0]?payments[0].method:'Cash', payments, cashTendered, changeGiven,
+    memberId: state.selectedMember?state.selectedMember.id:null, memberName: state.selectedMember?state.selectedMember.name:null,
+    pointsEarned, pointsRedeemed, type:'sale', refSaleId:null, processedBy: state.currentStaff.name,
+    manualDiscountAmount: mdAmount, manualDiscountType: state.manualDiscount.type, manualDiscountNote: state.manualDiscount.note, manualDiscountValue: state.manualDiscount.value,
+    bundlePromotions: bundlePromosApplied.map(r=>({name:r.promo.name, discountAmount:r.discountAmount, sets:r.sets})), bundlePromotionsTotal: bundlePromoTotal,
+  };
+  state.sales.push(sale);
+  let memberBackup = null;
+  if (state.selectedMember) {
+    const m = state.members.find(x=>x.id===state.selectedMember.id);
+    if (m) {
+      memberBackup={...m};
+      m.points = m.points - pointsRedeemed + pointsEarned;
+      m.totalSpend = (m.totalSpend||0) + total;
+      const storeCreditUsed = payments.filter(p=>p.method==='Store Credit').reduce((s,p)=>s+p.amount,0);
+      m.storeCredit = Math.max(0, (m.storeCredit||0) - storeCreditUsed);
+      maybeUpgradeTier(m);
+    }
+  }
+  try {
+    await gasUpsert('Sales', saleToRow(sale));
+    if (state.selectedMember) { const m = state.members.find(x=>x.id===state.selectedMember.id); if (m) await gasUpsert('Members', memberToRow(m)); }
+    state.checkoutSubmitting = false;
+    if (hasCash) {
+      openDrawerViaIminOrBrowser();
+      state.pendingReceiptSale = sale;
+      state.changeModalInfo = { tendered: cashTendered, change: changeGiven };
+      renderTab();
+    } else {
+      showReceipt(sale);
+      state.cart = []; state.currentStaff = null; state.selectedMember = null; state.redeemPoints = 0; state.cashTendered = null; state.paymentLines = []; state.manualDiscount = { type:'amount', value:0, note:'' }; state.itemDiscountModalSku = null; state.discountModalOpen = false;
+      if (state.idleTimer) clearTimeout(state.idleTimer);
+      showToast('Checkout complete ✓'); render();
+    }
+  } catch(e) { state.checkoutSubmitting = false; state.sales.pop(); if (memberBackup) { const m=state.members.find(x=>x.id===memberBackup.id); if(m) Object.assign(m, memberBackup); } showToast('Checkout failed, please try again', true); }
+}
+function renderChangeModal() {
+  if (!state.pendingReceiptSale) return '';
+  const info = state.changeModalInfo || {};
+  return `<div class="modal-backdrop">
+    <div class="modal" style="text-align:center">
+      <div style="font-size:14px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.04em">🔓 Cash drawer opened</div>
+      ${info.tendered!=null ? `
+        <div style="margin-top:14px;font-size:13px;color:var(--ink-soft)">Customer Paid</div>
+        <div style="font-size:22px;font-weight:700;color:var(--ink)">${money(info.tendered)}</div>
+        <div style="margin-top:10px;font-size:13px;color:var(--ink-soft)">Change Change</div>
+        <div style="font-size:36px;font-weight:800;color:var(--teal-deep)">${money(info.change)}</div>
+      ` : `<div style="margin-top:16px;font-size:15px;color:var(--ink-soft)">No amount entered for what the customer paid — please verify change yourself。</div>`}
+      <button class="btn btn-primary btn-full btn-lg" style="margin-top:22px" onclick="dismissChangeModal()">Done · Print Receipt</button>
+    </div>
+  </div>`;
+}
+function dismissChangeModal() {
+  const sale = state.pendingReceiptSale;
+  state.pendingReceiptSale = null; state.changeModalInfo = null;
+  if (sale) showReceipt(sale);
+  state.cart = []; state.currentStaff = null; state.selectedMember = null; state.redeemPoints = 0; state.cashTendered = null; state.paymentLines = []; state.manualDiscount = { type:'amount', value:0, note:'' }; state.itemDiscountModalSku = null; state.discountModalOpen = false;
+  if (state.idleTimer) clearTimeout(state.idleTimer);
+  showToast('Checkout complete ✓'); render();
+}
+
+function showReceipt(sale, isReprint) {
+  const w58 = state.config.paperWidth === '58';
+  const baseTitle = sale.type==='exchange' ? 'Exchange Receipt' : sale.type==='return' ? 'Refund Receipt' : 'Receipt';
+  const docTitle = isReprint ? 'Reprint ' + baseTitle : baseTitle;
+  const itemsHtml = sale.items.map(it => `
+    <div class="rc-line"><div class="rc-item-name">${esc(it.name)}${it.promo?' (Promo)':''}</div></div>
+    <div class="rc-line"><div style="font-size:9.5px">${esc(it.sku)}</div></div>
+    <div class="rc-line"><div>${it.qty} x ${money(it.unitPrice)}</div><div>${money(it.qty*it.unitPrice)}</div></div>
+  `).join('');
+  const html = `
+    <div class="receipt-paper ${w58?'w58':''}">
+      <div class="rc-title">${esc(state.config.shopName)}</div>
+      ${state.config.addressLine1?`<div class="rc-sub">${esc(state.config.addressLine1)}</div>`:''}
+      ${state.config.addressLine2?`<div class="rc-sub">${esc(state.config.addressLine2)}</div>`:''}
+      ${state.config.addressLine3?`<div class="rc-sub">${esc(state.config.addressLine3)}</div>`:''}
+      ${state.config.phone?`<div class="rc-sub">Tel: ${esc(state.config.phone)}</div>`:''}
+      ${state.config.sstNo?`<div class="rc-sub">SST: ${esc(state.config.sstNo)}</div>`:''}
+      <div class="rc-sub" style="font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:4px">${esc(docTitle)}</div>
+      <div style="margin-top:8px;text-align:left">
+        <div>Receipt no. : ${esc(sale.transactionNumber||'')}</div>
+        <div>Date : ${fmtDateTimeWithYear(sale.timestamp)}</div>
+        <div>Cashier : ${esc(sale.cashier)}</div>
+        ${sale.memberName?`<div>Member : ${esc(sale.memberName)}</div>`:''}
+      </div>
+      <hr>${itemsHtml}<hr>
+      <div class="rc-line"><div>Subtotal</div><div>${money(sale.subtotal)}</div></div>
+      ${(sale.bundlePromotions||[]).map(bp => `<div class="rc-line"><div>${esc(bp.name)} ×${bp.sets}</div><div>-${money(bp.discountAmount)}</div></div>`).join('')}
+      ${sale.manualDiscountAmount>0?`<div class="rc-line"><div>Discount${sale.manualDiscountType==='percent'?' ('+sale.manualDiscountValue+'%)':''}${sale.manualDiscountNote?' - '+esc(sale.manualDiscountNote): ''}</div><div>-${money(sale.manualDiscountAmount)}</div></div>`:''}
+      ${sale.discount>0?`<div class="rc-line"><div>Points Discount (${sale.pointsRedeemed}pt)</div><div>-${money(sale.discount)}</div></div>`:''}
+      ${sale.cashRoundingAdj!==0?`<div class="rc-line"><div>Rounding</div><div>${sale.cashRoundingAdj>0?'+':''}${money(sale.cashRoundingAdj)}</div></div>`:''}
+      <div class="rc-line rc-total"><div>TOTAL</div><div>${money(sale.total)}</div></div>
+      ${(sale.payments||[]).map(p => `<div class="rc-line"><div>${esc(p.method)}</div><div>${money(p.amount)}</div></div>`).join('')}
+      ${sale.cashTendered!=null?`<div class="rc-line"><div>Cash Tendered</div><div>${money(sale.cashTendered)}</div></div><div class="rc-line"><div>Change</div><div>${money(sale.changeGiven)}</div></div>`:''}
+      ${sale.memberName?`<div class="rc-line"><div>Points Earned</div><div>+${sale.pointsEarned}</div></div>`:''}
+      <hr>
+      <div class="rc-foot">Thank You and please come again!</div>
+      <div class="rc-foot" style="margin-top:6px;text-align:left">We are happy to replace or exchange products return within 3 days from the purchase date as long as it's returned in it's original packaging, unused, sellable condition and in good time. No cash refund.</div>
+    </div>`;
+  document.getElementById('receipt-print').innerHTML = html;
+  printReceiptViaIminOrBrowser(sale, isReprint);
+}
+function reprintSale(id) { const sale = state.sales.find(s=>s.id===id); if (sale) showReceipt(sale, true); }
+
+// ============ MEMBERS ============
+function renderMembers() {
+  const search = (state.memberListSearch || '').trim().toLowerCase();
+  const filtered = !search ? state.members : state.members.filter(m =>
+    m.name.toLowerCase().includes(search) || m.phone.toLowerCase().includes(search)
+  );
+  const pageSize = 300;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (state.memberPage >= totalPages) state.memberPage = totalPages - 1;
+  if (state.memberPage < 0) state.memberPage = 0;
+  const shown = filtered.slice(state.memberPage * pageSize, (state.memberPage + 1) * pageSize);
+  const rows = shown.length===0 ? `<tr><td colspan="6"><div class="empty">${search?'No members match the search':'No members added yet'}</div></td></tr>` :
+    shown.map(m => `<tr>
+      <td><a style="cursor:pointer;color:var(--teal);font-weight:700" onclick="showMemberDetail('${escAttr(m.id)}')">${esc(m.name)}</a></td><td style="font-family:var(--mono)">${esc(m.phone)}</td>
+      <td><span class="badge badge-tier-${tierClass(m.tier)}">${esc(m.tier||'Member')}</span></td>
+      <td class="num"><span class="badge badge-gold">${m.points}  pts</span></td>
+      <td class="num">${money(m.totalSpend||0)}</td>
+      <td class="num">${money(m.storeCredit||0)}</td>
+    </tr>`).join('');
+  return `
+    <div class="card">
+      <h2>Add Member</h2>
+      <div class="row3" style="align-items:end">
+        <div class="field" style="margin-bottom:0"><label>Name</label><input id="m-name" placeholder="e.g. Tan Mei Ling"></div>
+        <div class="field" style="margin-bottom:0"><label>Phone</label><input id="m-phone" placeholder="e.g. 0123456789"></div>
+        <div class="field" style="margin-bottom:0"><label>Starting points (optional)</label><input id="m-points" type="number" min="0" placeholder="0"></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:2px" onclick="addMember()">Add Member</button>
+    </div>
+    <div class="card">
+      <h2>Bulk Import Members</h2>
+      <p class="hint">Download the template first, prepare the member list in Excel/Google Sheets, save as .xlsx and upload. Existence is judged by phone number (a duplicate phone updates points instead of adding a duplicate).</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost" onclick="downloadMemberTemplate()">Download Import Template</button>
+        <label class="btn btn-primary" style="cursor:pointer">
+          Choose Excel File to Upload
+          <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleMemberImport(this)">
+        </label>
+      </div>
+      <div id="member-import-result" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Member List (${state.members.length})</h2>
+        ${state.members.length>0 ? `<button class="btn-danger" onclick="clearAllMembers()">Clear All Members</button>` : ''}
+      </div>
+      <div class="toolbar">
+        ${renderLiveSearchField('memberSearch','memberListSearch','Search name / phone')}
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Phone</th><th>Tier</th><th style="text-align:right">Points</th><th style="text-align:right">Total Spend</th><th style="text-align:right">Store Credit</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${totalPages>1 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px">
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeMemberPage(-1)" ${state.memberPage<=0?'disabled':''}>← Previous</button>
+          <span class="hint" style="margin:0">Page ${state.memberPage+1} of ${totalPages} (${filtered.length} members)</span>
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeMemberPage(1)" ${state.memberPage>=totalPages-1?'disabled':''}>Next →</button>
+        </div>
+      ` : ''}
+      <p class="hint" style="margin-top:8px">Click a name to view details, edit info, or delete the member.</p>
+    </div>
+    ${renderDangerModal()}
+    ${renderMemberDetailModal()}
+    ${renderEditAuthModal()}`;
+}
+function changeMemberPage(delta) { state.memberPage = Math.max(0, state.memberPage + delta); renderTab(); }
+function getTierThreshold(tierName) {
+  const t = (state.config.tiers||[]).find(t => t.name === tierName);
+  return t ? (t.threshold||0) : 0;
+}
+function matchTierName(raw) {
+  const r = raw.toLowerCase();
+  const tiers = state.config.tiers || [];
+  const exact = tiers.find(t => t.name.toLowerCase() === r);
+  if (exact) return exact.name;
+  const partial = tiers.find(t => r.includes(t.name.toLowerCase().replace(' member','')) );
+  if (partial) return partial.name;
+  return null;
+}
+async function addMember() {
+  const name = document.getElementById('m-name').value.trim(); const phone = document.getElementById('m-phone').value.trim();
+  const points = parseInt(document.getElementById('m-points').value,10) || 0;
+  if (!name||!phone) return showToast('Please fill in name and phone', true);
+  if (state.members.some(m=>m.phone===phone)) return showToast('This phone number is already a member', true);
+  const member = { id:'mem_'+Date.now(), name, phone, points, joinDate:new Date().toISOString(), tier:'Member', totalSpend:0 };
+  state.members.push(member);
+  try { await gasUpsert('Members', memberToRow(member)); showToast('Member added ✓'); renderTab(); } catch(e) { state.members.pop(); showToast('Save failed', true); }
+}
+function downloadMemberTemplate() {
+  const sample = [
+    { name:'Tan Mei Ling', phone:'0123456789', points:0, membership_tier:'Member' },
+    { name:'Lim Ah Kow', phone:'0198765432', points:50, membership_tier:'Silver Member' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sample, { header:['name','phone','points','membership_tier'] });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'members');
+  XLSX.writeFile(wb, 'member_import_template.xlsx');
+}
+async function handleMemberImport(input) {
+  const file = input.files[0]; if (!file) return;
+  const resultEl = document.getElementById('member-import-result');
+  resultEl.innerHTML = '<div class="hint">Parsing…</div>';
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
+    let added = 0, updated = 0, skipped = 0;
+    const touched = [];
+    for (const r of rows) {
+      let name = String(r.name || r.Name || '').trim();
+      if (!name) {
+        const first = String(r.firstname || r.first_name || '').trim();
+        const last = String(r.lastname || r.last_name || '').trim();
+        name = (first + ' ' + last).trim();
+      }
+      let phone = String(r.phone || r.Phone || '').trim();
+      if (!name || !phone) { skipped++; continue; }
+      let pointsRaw = r.points ?? r.Points ?? r.reward_points ?? r.new_reward_points ?? 0;
+      if (pointsRaw === '' || pointsRaw == null) pointsRaw = 0;
+      const points = Math.round(parseFloat(pointsRaw) * 100) / 100 || 0;
+      const tierRaw = String(r.membership_tier || r.tier || r.Tier || '').trim();
+      const matchedTier = tierRaw ? matchTierName(tierRaw) : null;
+      const tierThreshold = matchedTier ? getTierThreshold(matchedTier) : 0;
+      const existing = state.members.find(m => m.phone === phone);
+      if (existing) {
+        existing.name = name; existing.points = points;
+        if (matchedTier) existing.tier = matchedTier;
+        existing.totalSpend = Math.max(existing.totalSpend||0, tierThreshold);
+        updated++; touched.push(memberToRow(existing));
+      } else {
+        const m = { id:'mem_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name, phone, points, joinDate:new Date().toISOString(), tier: matchedTier||'Member', totalSpend: tierThreshold };
+        state.members.push(m); added++; touched.push(memberToRow(m));
+      }
+    }
+    await gasBulkUpsert('Members', touched);
+    resultEl.innerHTML = `<div class="hint" style="color:var(--teal-deep);font-weight:700">✓ Added ${added} , updated ${updated} ${skipped>0?`, skipped ${skipped} (missing name/phone)`:''}</div>`;
+    showToast('Import complete ✓'); renderTab();
+  } catch (e) {
+    resultEl.innerHTML = '<div class="hint" style="color:var(--danger)">Parse failed, please check the file format</div>';
+    showToast('Import failed', true);
+  }
+  input.value = '';
+}
+async function removeMember(id) {
+  const idx = state.members.findIndex(m=>m.id===id); if (idx===-1) return;
+  const removed = state.members.splice(idx,1)[0];
+  try { await gasDelete('Members', id); logAuditEvent(state.editingStaff, 'Delete Member', `${removed.name} (${removed.phone})`); showToast('Member removed'); state.memberDetailId = null; renderTab(); } catch(e) { state.members.splice(idx,0,removed); showToast('Save failed', true); }
+}
+
+// ---- Member Detail Modal ----
+function showMemberDetail(id) { state.memberDetailId = id; state.memberEditMode = false; renderTab(); }
+function closeMemberDetail() { state.memberDetailId = null; state.memberEditMode = false; renderTab(); }
+function startEditMember() { state.memberEditMode = true; renderTab(); }
+function renderMemberDetailModal() {
+  if (!state.memberDetailId) return '';
+  const m = state.members.find(x => x.id === state.memberDetailId);
+  if (!m) return '';
+  if (state.memberEditMode) {
+    return `<div class="modal-backdrop" onclick="if(event.target===this) closeMemberDetail()">
+      <div class="modal">
+        <h2 style="margin-top:0">Edit Member</h2>
+        <div class="field"><label>Name</label><input id="med-name" value="${esc(m.name)}"></div>
+        <div class="field"><label>Phone</label><input id="med-phone" value="${esc(m.phone)}"></div>
+        <div class="row">
+          <div class="field"><label>Tier</label>
+            <select id="med-tier">${(state.config.tiers||[]).map(t=>`<option value="${esc(t.name)}" ${m.tier===t.name?'selected':''}>${esc(t.name)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Points</label><input id="med-points" type="number" step="0.01" value="${m.points}"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Total Spend (RM)</label><input id="med-totalspend" type="number" step="0.01" value="${m.totalSpend||0}"></div>
+          <div class="field"><label>Store Credit (RM)</label><input id="med-storecredit" type="number" step="0.01" value="${m.storeCredit||0}"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="saveMemberDetail()">Save</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="state.memberEditMode=false; renderTab();">Cancel</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeMemberDetail()">
+    <div class="modal">
+      <h2 style="margin-top:0">${esc(m.name)} <span class="badge badge-tier-${tierClass(m.tier)}">${esc(m.tier||'Member')}</span></h2>
+      <p class="hint">Joined: ${new Date(m.joinDate).toLocaleDateString('zh-CN')}</p>
+      <div class="summary-row"><div>Phone</div><div class="val">${esc(m.phone)}</div></div>
+      <div class="summary-row"><div>Points</div><div class="val">${m.points}</div></div>
+      <div class="summary-row"><div>Total Spend</div><div class="val">${money(m.totalSpend||0)}</div></div>
+      <div class="summary-row total"><div>Store Credit</div><div class="val">${money(m.storeCredit||0)}</div></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-primary" style="flex:1" onclick="requestEditAuth('${escAttr(m.id)}','memberEdit',true)">Edit</button>
+        <button class="btn btn-danger-solid" style="flex:1" onclick="requestEditAuth('${escAttr(m.id)}','memberDelete',true)">Delete</button>
+      </div>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeMemberDetail()">Close</button>
+    </div>
+  </div>`;
+}
+async function saveMemberDetail() {
+  const m = state.members.find(x => x.id === state.memberDetailId); if (!m) return;
+  const name = document.getElementById('med-name').value.trim();
+  const phone = document.getElementById('med-phone').value.trim();
+  const tier = document.getElementById('med-tier').value;
+  const points = parseFloat(document.getElementById('med-points').value) || 0;
+  const totalSpend = parseFloat(document.getElementById('med-totalspend').value) || 0;
+  const storeCredit = parseFloat(document.getElementById('med-storecredit').value) || 0;
+  if (!name || !phone) return showToast('Name and phone cannot be blank', true);
+  const prev = { ...m };
+  Object.assign(m, { name, phone, tier, points, totalSpend, storeCredit });
+  try {
+    await gasUpsert('Members', memberToRow(m));
+    logAuditEvent(state.editingStaff, 'Edit Member', `${m.name} (${m.phone})`);
+    showToast('Saved ✓'); state.memberEditMode = false; renderTab();
+  }
+  catch(e) { Object.assign(m, prev); showToast('Save failed', true); renderTab(); }
+}
+
+// ============ PRODUCTS ============
+function changeProductPage(delta) { state.productPage = Math.max(0, state.productPage + delta); renderTab(); }
+function renderProducts() {
+  const search = (state.productSearch || '').trim().toLowerCase();
+  const filtered = !search ? state.products : state.products.filter(p =>
+    p.sku.toLowerCase().includes(search) ||
+    p.name.toLowerCase().includes(search) ||
+    (p.brand||'').toLowerCase().includes(search) ||
+    (p.barcodes||[]).some(b => b.toLowerCase().includes(search))
+  );
+  const pageSize = 200;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (state.productPage >= totalPages) state.productPage = totalPages - 1;
+  if (state.productPage < 0) state.productPage = 0;
+  const shown = filtered.slice(state.productPage * pageSize, (state.productPage + 1) * pageSize);
+  const rows = shown.length===0 ? `<tr><td colspan="8"><div class="empty">${search?'No products match the search':'No products added yet'}</div></td></tr>` :
+    shown.map(p => `<tr>
+      <td><a style="cursor:pointer" class="sku-code" onclick="requestEditAuth('${escAttr(p.sku)}','productEdit',false)">${esc(p.sku)}</a></td>
+      <td style="min-width:160px">
+        <div class="chip-list">${(p.barcodes||[]).map(b => `<div class="chip" style="font-family:var(--mono);font-size:11px">${esc(b)}<button onclick="removeBarcode('${escAttr(p.sku)}','${escAttr(b)}')">×</button></div>`).join('') || '<span class="hint" style="margin:0">None</span>'}</div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input type="text" id="add-bc-${escAttr(p.sku)}" placeholder="Add barcode" style="padding:6px 8px;font-size:12px">
+          <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="addBarcode('${escAttr(p.sku)}')">Add</button>
+        </div>
+      </td>
+      <td>${esc(p.name)}<br><span style="font-size:11px;color:var(--ink-soft)">${esc(p.brand||'')}</span></td>
+      <td class="num">${money(p.price)}</td>
+      <td class="num">${p.promoPrice!=null && p.promoPrice!==''?money(p.promoPrice): '—'}</td>
+      <td style="text-align:center"><input type="checkbox" ${p.promoActive?'checked':''} onchange="togglePromo('${escAttr(p.sku)}', this.checked)"></td>
+      <td class="num">${p.commissionType==='percent' ? `${money(activePrice(p) * (p.commission||0) / 100)} <span style="color:var(--ink-soft);font-weight:400;font-size:11px">(${p.commission||0}%)</span>` : money(p.commission||0)}</td>
+      <td><button class="btn-danger" onclick="requestEditAuth('${escAttr(p.sku)}','productDelete',true)">Delete</button>
+        ${p.editedBy ? `<div class="hint" style="margin-top:4px;font-size:10.5px">Last edited: ${esc(p.editedBy)} · ${fmtDateTime(p.editedAt)}</div>` : ''}
+      </td>
+    </tr>`).join('');
+  const editing = state.editingSku ? state.products.find(p => p.sku === state.editingSku) : null;
+  return `
+    <div class="card" id="product-form-card">
+      <h2>${editing ? 'Edit Product · '+esc(editing.sku)+(state.editingStaff?' · Operator:'+esc(state.editingStaff.name): '') : 'Add Product'}</h2>
+      <p class="hint">SKU needs to exactly match your inventory system's SKU (character-for-character), so the end-of-day export lines up correctly.</p>
+      <div class="row3">
+        <div class="field"><label>Brand</label><input id="p-brand" placeholder="e.g. Attipas" value="${editing?esc(editing.brand||''): ''}"></div>
+        <div class="field"><label>SKU (Inventory System SKU)</label><input id="p-sku" placeholder="e.g. AT-BLK-M" value="${editing?esc(editing.sku): ''}" ${editing?'readonly style="background:#F4F1EA;color:var(--ink-soft)"':''}></div>
+        <div class="field"><label>Product Name</label><input id="p-name" placeholder="e.g. Classic Toddler Shoe Black M" value="${editing?esc(editing.name): ''}"></div>
+      </div>
+      ${editing ? '' : `
+      <div class="field">
+        <label>Barcode (multiple allowed, comma-separated — for different suppliers/packaging that changed barcodes)</label>
+        <input id="p-barcodes" placeholder="e.g. 1234567890123, 9876543210987">
+      </div>`}
+      <div class="row3">
+        <div class="field"><label>Original Price (RM)</label><input id="p-price" type="number" step="0.01" min="0" placeholder="e.g. 89.00" value="${editing?editing.price:''}"></div>
+        <div class="field"><label>Promo Price (RM, optional)</label><input id="p-promo" type="number" step="0.01" min="0" placeholder="e.g. 69.00" value="${editing && editing.promoPrice!=null?editing.promoPrice:''}"></div>
+        <div class="field"><label>Commission Type</label>
+          <select id="p-commission-type" ${(editing && !isEditingManager())?'disabled':''}>
+            <option value="fixed" ${editing && editing.commissionType==='fixed'?'selected':''}>Fixed Amount (RM/unit)</option>
+            <option value="percent" ${editing && editing.commissionType==='percent'?'selected':''}>Percentage (%, based on actual selling price)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Commission value (RM amount for fixed, or a number like 5 for 5% percentage)</label><input id="p-commission" type="number" step="0.01" min="0" placeholder="e.g. 2.00 or 5" value="${editing?editing.commission||0:''}" ${(editing && !isEditingManager())?'disabled':''}></div>
+        ${(editing && !isEditingManager()) ? `<p class="hint" style="align-self:end;margin-bottom:12px">Commission field requires manager permission to edit · <a style="cursor:pointer;color:var(--teal)" onclick="requestEditAuth('${escAttr(editing.sku)}','productEdit',true)">Scan manager card to unlock</a></p>` : ''}
+      </div>
+      <div class="section-title">Bundle Discount (optional — e.g. buy 2, get RM10 off)</div>
+      <div class="row3">
+        <div class="field"><label>Buy quantity to trigger (0 = off)</label><input id="p-bundle-qty" type="number" step="1" min="0" placeholder="e.g. 2" value="${editing?(editing.bundleQty||''):''}"></div>
+        <div class="field"><label>Discount Type</label>
+          <select id="p-bundle-type">
+            <option value="amount" ${editing && editing.bundleDiscountType==='amount'?'selected':''}>Fixed Amount (RM per bundle)</option>
+            <option value="percent" ${editing && editing.bundleDiscountType==='percent'?'selected':''}>Percentage (% off that bundle)</option>
+          </select>
+        </div>
+        <div class="field"><label>Discount value</label><input id="p-bundle-value" type="number" step="0.01" min="0" placeholder="e.g. 10 or 15" value="${editing?(editing.bundleDiscountValue||''):''}"></div>
+      </div>
+      <p class="hint">Applies automatically at checkout once the quantity in the cart reaches this threshold — repeats for every complete set (e.g. threshold 2, buy 4 = discount applied twice).</p>
+      ${editing ? `
+        <button class="btn btn-primary" onclick="updateProduct()">Update Product</button>
+        <button class="btn btn-ghost" onclick="cancelEditProduct()">Cancel Edit</button>
+      ` : `<button class="btn btn-primary" onclick="addProduct()">Add Product</button>`}
+    </div>
+    <div class="card">
+      <h2>Bulk Import Products</h2>
+      <p class="hint">First download the template, prepare the data in Excel/Google Sheets (bulk copy-paste of SKUs works), save as .xlsx then upload. Leave Promo price/Commission blank for no promo/no commission.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost" onclick="downloadProductTemplate()">Download Import Template</button>
+        <label class="btn btn-primary" style="cursor:pointer">
+          Choose Excel File to Upload
+          <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleProductImport(this)">
+        </label>
+      </div>
+      <div id="product-import-result" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Product List (${state.products.length})</h2>
+        ${state.products.length>0 ? `<button class="btn-danger" onclick="clearAllProducts()">Clear All Products</button>` : ''}
+      </div>
+      <div class="toolbar">
+        ${renderLiveSearchField('productSearch','productSearch','Search SKU / Barcode / Product Name / Brand')}
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr><th>SKU</th><th>Barcode</th><th>Products</th><th style="text-align:right">Original Price</th><th style="text-align:right">Promo Price</th><th style="text-align:center">Promo Active</th><th style="text-align:right">Commission</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${totalPages>1 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px">
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeProductPage(-1)" ${state.productPage<=0?'disabled':''}>← Previous</button>
+          <span class="hint" style="margin:0">Page ${state.productPage+1} of ${totalPages} (${filtered.length} products)</span>
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeProductPage(1)" ${state.productPage>=totalPages-1?'disabled':''}>Next →</button>
+        </div>
+      ` : ''}
+    </div>
+    ${renderEditAuthModal()}
+    ${renderDangerModal()}`;
+}
+async function addProduct() {
+  const brand = document.getElementById('p-brand').value.trim(); const sku = document.getElementById('p-sku').value.trim();
+  const name = document.getElementById('p-name').value.trim(); const price = parseFloat(document.getElementById('p-price').value);
+  const promoRaw = document.getElementById('p-promo').value; const promoPrice = promoRaw!==''?parseFloat(promoRaw): null;
+  const commissionType = document.getElementById('p-commission-type').value;
+  const commission = parseFloat(document.getElementById('p-commission').value) || 0;
+  const barcodes = document.getElementById('p-barcodes').value.split(',').map(b=>b.trim()).filter(Boolean);
+  const bundleQty = parseInt(document.getElementById('p-bundle-qty').value) || 0;
+  const bundleDiscountType = document.getElementById('p-bundle-type').value;
+  const bundleDiscountValue = parseFloat(document.getElementById('p-bundle-value').value) || 0;
+  if (!sku||!name||isNaN(price)) return showToast('Please fill in SKU, name, and original price', true);
+  if (state.products.some(p=>p.sku===sku)) return showToast('This SKU already exists', true);
+  const product = { brand, sku, name, price, promoPrice, promoActive: promoPrice!=null, commission, commissionType, barcodes, bundleQty, bundleDiscountType, bundleDiscountValue };
+  state.products.push(product);
+  try { await gasUpsert('Products', productToRow(product)); showToast('Product added ✓'); renderTab(); } catch(e) { state.products.pop(); showToast('Save failed', true); }
+}
+function requestEditAuth(targetId, action, requireManager) {
+  state.pendingEditSku = targetId; state.editAuthAction = action || 'productEdit'; state.editAuthRequireManager = !!requireManager;
+  state.editAuthOpen = true; state.scanBuffers.editAuth = '';
+  renderTab(); neutralizeFocus();
+}
+function cancelEditAuth() { state.editAuthOpen = false; state.pendingEditSku = null; state.editAuthAction = null; state.editAuthRequireManager = false; state.scanBuffers.editAuth = ''; renderTab(); }
+
+// ============ Return / Exchange ============
+function requestReturnAuth(saleId) {
+  state.pendingReturnSaleId = saleId; state.returnAuthOpen = true; state.scanBuffers.returnAuth = '';
+  renderTab(); neutralizeFocus();
+}
+function cancelReturnAuth() { state.returnAuthOpen = false; state.pendingReturnSaleId = null; state.scanBuffers.returnAuth = ''; renderTab(); }
+function submitReturnAuth(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  const saleId = state.pendingReturnSaleId;
+  state.returnAuthOpen = false; state.pendingReturnSaleId = null; state.scanBuffers.returnAuth = '';
+  state.returnStaff = staff;
+  openReturnEditor(saleId);
+}
+function renderReturnAuthModal() {
+  if (!state.returnAuthOpen) return '';
+  return `<div class="modal-backdrop" onclick="if(event.target===this) cancelReturnAuth()">
+    <div class="modal">
+      <h2 style="margin-top:0">🔒 Scan a staff card to process a return/exchange</h2>
+      <p class="hint">The system will record who processed it.</p>
+      <div class="field">${renderScanField('returnAuth','Scan barcode',true)}</div>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="cancelReturnAuth()">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function getAlreadyReturnedMap(saleId) {
+  const map = {};
+  for (const s of state.sales) {
+    if (s.refSaleId !== saleId) continue;
+    if (s.type !== 'return' && s.type !== 'exchange') continue;
+    for (const it of s.items) {
+      if (it.qty < 0) map[it.sku] = (map[it.sku]||0) + (-it.qty);
+    }
+  }
+  return map;
+}
+function isSaleFullyReturned(sale) {
+  const returned = getAlreadyReturnedMap(sale.id);
+  return sale.items.every(it => (returned[it.sku]||0) >= it.qty);
+}
+function openReturnEditor(saleId) {
+  const sale = state.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const returned = getAlreadyReturnedMap(saleId);
+  state.returnOrigSale = sale;
+  state.returnItems = sale.items.map(it => {
+    const already = returned[it.sku] || 0;
+    return { sku:it.sku, name:it.name, unitPrice:it.unitPrice, commission:it.commission||0, maxQty: Math.max(0, it.qty - already), alreadyReturned: already, returnQty:0 };
+  });
+  state.returnNewCart = [];
+  state.returnPaymentLines = [];
+  state.returnModalOpen = true;
+  renderTab(); neutralizeFocus();
+}
+function cancelReturnModal() { state.returnModalOpen = false; state.returnOrigSale = null; state.returnItems = []; state.returnNewCart = []; state.returnPaymentLines = []; state.returnStaff = null; state.returnSubmitting = false; renderTab(); }
+function changeReturnQty(sku, delta) {
+  const it = state.returnItems.find(x => x.sku === sku); if (!it) return;
+  it.returnQty = Math.max(0, Math.min(it.maxQty, it.returnQty + delta));
+  state.returnPaymentLines = []; // Details changed, settlement resets
+  renderTab();
+}
+function returnRefundAmount() { return state.returnItems.reduce((sum,it) => sum + it.unitPrice * it.returnQty, 0); }
+function returnCommissionReversal() { return state.returnItems.reduce((sum,it) => sum + (it.commission||0) * it.returnQty, 0); }
+function addReturnNewItem(sku) {
+  const p = state.products.find(pr => pr.sku === sku || (pr.barcodes||[]).includes(sku));
+  if (!p) return showToast('SKU / Barcode not found: '+sku, true);
+  const existing = state.returnNewCart.find(c => c.sku === p.sku);
+  if (existing) existing.qty += 1;
+  else state.returnNewCart.push({ sku:p.sku, name:p.name, price: activePrice(p), commission: (p.commissionType==='percent' ? activePrice(p)*(p.commission||0)/100 : (p.commission||0)), qty:1 });
+  state.returnPaymentLines = [];
+  renderTab();
+}
+function changeReturnNewQty(sku, delta) {
+  const it = state.returnNewCart.find(x => x.sku === sku); if (!it) return;
+  it.qty += delta;
+  if (it.qty <= 0) state.returnNewCart = state.returnNewCart.filter(x => x.sku !== sku);
+  state.returnPaymentLines = [];
+  renderTab();
+}
+function returnNewItemsTotal() { return state.returnNewCart.reduce((sum,it) => sum + it.price*it.qty, 0); }
+function returnNewItemsCommission() { return state.returnNewCart.reduce((sum,it) => sum + it.commission*it.qty, 0); }
+function returnNetAmount() { return round2(returnNewItemsTotal() - returnRefundAmount()); }
+function returnPaymentTarget() { return Math.abs(returnNetAmount()); }
+function returnPaymentLinesSum() { return round2(state.returnPaymentLines.reduce((s,l)=>s+(l.amount||0),0)); }
+function returnPaymentRemaining() { return Math.max(0, round2(returnPaymentTarget() - returnPaymentLinesSum())); }
+function addReturnPaymentLine(method) {
+  const remaining = returnPaymentRemaining();
+  if (remaining <= 0.001) return showToast('Amount already fully settled', true);
+  const net = returnNetAmount();
+  let amount = remaining;
+  if (method === 'Store Credit') {
+    const member = state.returnOrigSale.memberId ? state.members.find(m=>m.id===state.returnOrigSale.memberId) : null;
+    if (!member) return showToast('This transaction has no member, Store Credit cannot be used', true);
+    if (net > 0) { // customer-pays direction, must have sufficient balance to deduct
+      const usedByOthers = state.returnPaymentLines.filter(l=>l.method==='Store Credit').reduce((s,l)=>s+l.amount,0);
+      const avail = Math.max(0, (member.storeCredit||0) - usedByOthers);
+      if (avail <= 0) return showToast('This member has no available Store Credit balance', true);
+      amount = Math.min(remaining, avail);
+    }
+    // net < 0(refund direction) is issuing/adding balance, no need to check the existing balance cap
+  }
+  state.returnPaymentLines.push({ method, amount: round2(amount) });
+  renderTab();
+}
+function removeReturnPaymentLine(idx) { state.returnPaymentLines.splice(idx,1); renderTab(); }
+function updateReturnPaymentLineAmount(idx, val) {
+  const line = state.returnPaymentLines[idx]; if (!line) return;
+  let n = parseFloat(String(val).replace(/[^0-9.]/g,'')); if (isNaN(n)||n<0) n = 0;
+  line.amount = round2(n);
+  renderTab();
+}
+function renderReturnModal() {
+  if (!state.returnModalOpen) return '';
+  const sale = state.returnOrigSale;
+  const refund = returnRefundAmount();
+  const newTotal = returnNewItemsTotal();
+  const net = returnNetAmount();
+  return `<div class="modal-backdrop">
+    <div class="modal" style="max-width:520px">
+      <h2 style="margin-top:0">🔁 Return / Exchange</h2>
+      <p class="hint">Original transaction: ${fmtDateTime(sale.timestamp)} · Cashier: ${esc(sale.cashier)} · Processed by: ${esc(state.returnStaff?state.returnStaff.name:'')}</p>
+      <div class="section-title">Select items to return</div>
+      ${state.returnItems.map(it => `
+        <div class="cart-row">
+          <div><div class="cart-item-name">${esc(it.name)}</div><div class="cart-item-sub">${esc(it.sku)} · Unit Price ${money(it.unitPrice)} · Remaining returnable ${it.maxQty} units${it.alreadyReturned>0?` · Already returned ${it.alreadyReturned} units`:''}</div></div>
+          <div class="qty-ctrl"><button class="qty-btn" onclick="changeReturnQty('${escAttr(it.sku)}',-1)" ${it.maxQty===0?'disabled':''}>−</button><div class="qty-val">${it.returnQty}</div><button class="qty-btn" onclick="changeReturnQty('${escAttr(it.sku)}',1)" ${it.maxQty===0?'disabled':''}>+</button></div>
+          <div class="num">${it.maxQty===0?'<span class="hint" style="margin:0">Fully returned</span>':'Return '+money(it.unitPrice*it.returnQty)}</div>
+        </div>`).join('')}
+      <div class="summary-row"><div>Return Amount</div><div class="val">−${money(refund)}</div></div>
+
+      <div class="section-title">Add new item (exchange, optional)</div>
+      <div class="scan-box">
+        <input id="return-new-item-input" placeholder="Enter SKU then press Enter to add" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault(); addReturnNewItem(this.value.trim()); this.value='';}">
+        <button class="btn btn-primary" onclick="addReturnNewItem(document.getElementById('return-new-item-input').value.trim()); document.getElementById('return-new-item-input').value='';">Add</button>
+      </div>
+      ${state.returnNewCart.map(it => `
+        <div class="cart-row">
+          <div><div class="cart-item-name">${esc(it.name)}</div><div class="cart-item-sub">${esc(it.sku)} · Unit Price ${money(it.price)}</div></div>
+          <div class="qty-ctrl"><button class="qty-btn" onclick="changeReturnNewQty('${escAttr(it.sku)}',-1)">−</button><div class="qty-val">${it.qty}</div><button class="qty-btn" onclick="changeReturnNewQty('${escAttr(it.sku)}',1)">+</button></div>
+          <div class="num">${money(it.price*it.qty)}</div>
+        </div>`).join('')}
+      ${state.returnNewCart.length>0 ? `<div class="summary-row"><div>New Item Amount</div><div class="val">+${money(newTotal)}</div></div>` : ''}
+
+      <div class="summary-row total"><div>${net<0?'Refund to Customer':net>0?'Customer to Pay':'Even, no balance due'}</div><div class="val">${money(Math.abs(net))}</div></div>
+      ${sale.memberId ? (() => {
+        const member = state.members.find(m => m.id === sale.memberId);
+        if (!member) return '';
+        const ratio = sale.total ? Math.min(1, refund / Math.abs(sale.total)) : 0;
+        const earnedReversal = Math.round((sale.pointsEarned||0) * ratio);
+        const redeemedRefund = Math.round((sale.pointsRedeemed||0) * ratio);
+        const rates = getMemberRates(member);
+        const newItemsEarned = net > 0 ? Math.floor(net * (rates.earnRate||0)) : 0;
+        const delta = newItemsEarned - earnedReversal + redeemedRefund;
+        return `<p class="hint">Member ${esc(member.name)} Points to adjust: <b style="color:${delta>=0?'var(--teal-deep)':'var(--danger)'}">${delta>=0?'+':''}${delta}</b>(currently ${member.points} pts)</p>`;
+      })() : ''}
+
+      ${net!==0 ? `
+        <div class="section-title">Settlement Method ${net<0?'(refund to customer)':'(customer pays)'}</div>
+        <div class="pay-grid">
+          <div class="pay-opt" onclick="addReturnPaymentLine('Cash')">+ Cash</div>
+          <div class="pay-opt" onclick="addReturnPaymentLine('Credit Card')">+ Credit Card</div>
+          <div class="pay-opt" onclick="addReturnPaymentLine('Debit Card')">+ Debit Card</div>
+          <div class="pay-opt" onclick="addReturnPaymentLine('E-wallet')">+ E-wallet</div>
+          ${sale.memberId ? `<div class="pay-opt" onclick="addReturnPaymentLine('Store Credit')">+ Store Credit</div>` : ''}
+        </div>
+        ${state.returnPaymentLines.length>0 ? state.returnPaymentLines.map((l,i) => `
+          <div class="cart-row">
+            <div class="cart-item-name">${esc(l.method)}</div>
+            <div><input type="text" inputmode="decimal" value="${l.amount}" style="width:88px;text-align:right;padding:6px 8px" onchange="updateReturnPaymentLineAmount(${i}, this.value)"></div>
+            <button class="btn-danger" onclick="removeReturnPaymentLine(${i})">×</button>
+          </div>`).join('') : ''}
+        <div class="summary-row"><div>Settled</div><div class="val">${money(returnPaymentLinesSum())}</div></div>
+        ${returnPaymentRemaining()>0.001 ? `<div class="summary-row" style="color:var(--danger);font-weight:800"><div>Remaining</div><div class="val">${money(returnPaymentRemaining())}</div></div>` : ''}
+      ` : ''}
+
+      <button class="btn btn-danger-solid btn-full btn-lg" style="margin-top:16px" onclick="submitReturnExchange()" ${(state.returnItems.every(it=>it.returnQty===0) && state.returnNewCart.length===0) || (net!==0 && returnPaymentRemaining()>0.001) || state.returnSubmitting?'disabled':''}>${state.returnSubmitting?'Processing…':'Confirm '+(state.returnNewCart.length>0?'Exchange':'Return')}</button>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="cancelReturnModal()">Cancel</button>
+    </div>
+  </div>`;
+}
+async function submitReturnExchange() {
+  if (state.returnSubmitting) return; // prevent rapid repeated clicks from causing a duplicate return/exchange
+  const openShift = getOpenShift();
+  if (!openShift) return showToast('No shift is currently open, cannot process a return/exchange', true);
+  const returned = state.returnItems.filter(it => it.returnQty > 0);
+  if (returned.length===0 && state.returnNewCart.length===0) return showToast('Please select items to return or add new items', true);
+  const net = returnNetAmount();
+  if (Math.abs(net) > 0.001 && returnPaymentRemaining() > 0.001) return showToast('Settlement amount not fully covered yet', true);
+  state.returnSubmitting = true;
+  renderTab();
+  const items = [
+    ...returned.map(it => ({ sku:it.sku, name:it.name, qty:-it.returnQty, unitPrice:it.unitPrice, promo:false, commission:it.commission })),
+    ...state.returnNewCart.map(it => ({ sku:it.sku, name:it.name, qty:it.qty, unitPrice:it.price, promo:false, commission:it.commission })),
+  ];
+  const commissionTotal = items.reduce((sum,it) => sum + it.commission*it.qty, 0);
+  const refund = returnRefundAmount();
+  const type = state.returnNewCart.length>0 ? 'exchange' : 'return';
+  const origSale = state.returnOrigSale;
+  const sign = net < 0 ? -1 : 1;
+  const payments = state.returnPaymentLines.map(l => ({ method:l.method, amount: round2(l.amount * sign) }));
+
+  // ---- Automatic member points adjustment ----
+  let pointsEarnedField = 0, pointsRedeemedField = 0;
+  const member = origSale.memberId ? state.members.find(m => m.id === origSale.memberId) : null;
+  if (member) {
+    const ratio = origSale.total ? Math.min(1, refund / Math.abs(origSale.total)) : 0;
+    const earnedReversal = Math.round((origSale.pointsEarned||0) * ratio);   // Deduct originally-earned points proportional to the return
+    const redeemedRefund = Math.round((origSale.pointsRedeemed||0) * ratio); // Refund originally-spent points proportional to the return
+    const rates = getMemberRates(member);
+    const newItemsEarned = net > 0 ? Math.floor(net * (rates.earnRate||0)) : 0; // The extra amount paid in an exchange earns points normally at the member's current tier
+    pointsEarnedField = newItemsEarned - earnedReversal;
+    pointsRedeemedField = -redeemedRefund;
+  }
+
+  const record = {
+    // Commission always goes to the staff member of the original sale, not whoever processes the return;processedBy separately records who actually carried out this return/exchange
+    id:'ret_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), timestamp:new Date().toISOString(), shiftId: openShift.id, transactionNumber: generateTransactionNumber(type),
+    cashier: origSale.cashier, cashierId: origSale.cashierId, commissionStaff: origSale.commissionStaff, commissionStaffId: origSale.commissionStaffId,
+    commissionTotal, items, subtotal: net, discount:0, cashRoundingAdj:0, total: net,
+    payMethod: payments[0]?payments[0].method:'—', payments, cashTendered:null, changeGiven:null,
+    memberId: origSale.memberId||null, memberName: origSale.memberName||null, pointsEarned: pointsEarnedField, pointsRedeemed: pointsRedeemedField,
+    type, refSaleId: origSale.id, processedBy: state.returnStaff.name,
+  };
+  state.sales.push(record);
+  let memberBackup = null;
+  if (member) {
+    memberBackup = { ...member };
+    member.points = Math.max(0, member.points - pointsRedeemedField + pointsEarnedField);
+    member.totalSpend = Math.max(0, (member.totalSpend||0) + net);
+    // Store Credit Settlement: refund direction (net<0) issues/adds balance; customer-pays direction (net>0) deducts the balance used
+    for (const p of payments) {
+      if (p.method === 'Store Credit') member.storeCredit = Math.max(0, (member.storeCredit||0) - p.amount);
+    }
+    maybeUpgradeTier(member);
+  }
+  try {
+    await gasUpsert('Sales', saleToRow(record));
+    if (member) await gasUpsert('Members', memberToRow(member));
+    if (payments.some(p=>p.method==='Cash') && net !== 0) printReturnSlip(record);
+    showToast((type==='exchange'?'Exchange':'Return')+' processing complete ✓'+(member?` · points adjustment ${pointsEarnedField-pointsRedeemedField>=0?'+':''}${pointsEarnedField-pointsRedeemedField}`:''));
+    cancelReturnModal();
+  } catch(e) { state.returnSubmitting = false; state.sales.pop(); if (memberBackup) Object.assign(member, memberBackup); showToast('Save failed', true); renderTab(); }
+}
+function printReturnSlip(record) {
+  const w58 = state.config.paperWidth === '58';
+  const docTitle = record.type==='exchange' ? 'Exchange Receipt' : 'Refund Receipt';
+  const itemsHtml = record.items.map(it => `<div class="rc-line"><div>${it.qty<0?'Return':'Add'} ${esc(it.name)}</div><div>${it.qty<0?'−':''}${money(Math.abs(it.qty*it.unitPrice))}</div></div>`).join('');
+  const html = `
+    <div class="receipt-paper ${w58?'w58':''}">
+      <div class="rc-title">${esc(state.config.shopName)}</div>
+      ${state.config.addressLine1?`<div class="rc-sub">${esc(state.config.addressLine1)}</div>`:''}
+      ${state.config.addressLine2?`<div class="rc-sub">${esc(state.config.addressLine2)}</div>`:''}
+      ${state.config.addressLine3?`<div class="rc-sub">${esc(state.config.addressLine3)}</div>`:''}
+      ${state.config.phone?`<div class="rc-sub">Tel: ${esc(state.config.phone)}</div>`:''}
+      <div class="rc-sub" style="font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:4px">${esc(docTitle)}</div>
+      <div style="margin-top:8px;text-align:left">
+        <div>Receipt no. : ${esc(record.transactionNumber||'')}</div>
+        <div>Ref : ${esc(state.returnOrigSale?state.returnOrigSale.transactionNumber:'')}</div>
+        <div>Date : ${fmtDateTimeWithYear(record.timestamp)}</div>
+        <div>Cashier : ${esc(record.processedBy||record.cashier)}</div>
+      </div>
+      <hr>${itemsHtml}<hr>
+      <div class="rc-line rc-total"><div>${record.total<0?'Refund to Customer':'Customer Paid Extra'}</div><div>${money(Math.abs(record.total))}</div></div>
+      <hr>
+      <div class="rc-foot">Thank You and please come again!</div>
+      <div class="rc-foot" style="margin-top:6px;text-align:left">We are happy to replace or exchange products return within 3 days from the purchase date as long as it's returned in it's original packaging, unused, sellable condition and in good time. No cash refund.</div>
+    </div>`;
+  const el = document.getElementById('receipt-print');
+  if (el) el.innerHTML = html;
+  printReceiptViaIminOrBrowser(record, false);
+}
+function submitEditAuth(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  if (state.editAuthRequireManager && staff.role !== 'manager') return showToast('This action requires manager permission', true);
+  const targetId = state.pendingEditSku;
+  const action = state.editAuthAction;
+  state.editAuthOpen = false; state.pendingEditSku = null; state.editAuthAction = null; state.editAuthRequireManager = false; state.scanBuffers.editAuth = '';
+  state.editingStaff = staff;
+  if (action === 'productEdit') { startEditProduct(targetId); }
+  else if (action === 'productDelete') { doRemoveProduct(targetId); }
+  else if (action === 'memberEdit') { state.memberDetailId = targetId; state.memberEditMode = true; renderTab(); }
+  else if (action === 'memberDelete') { removeMember(targetId); }
+}
+function renderEditAuthModal() {
+  if (!state.editAuthOpen) return '';
+  const title = state.editAuthRequireManager ? '🔒 Requires manager card scan for authorization' : '🔒 Scan a staff card to edit';
+  const hint = state.editAuthRequireManager ? 'This is a sensitive action (commission/delete), only a manager card can authorize it.' : 'Editing requires verifying identity first, the system will record who made the change.';
+  return `<div class="modal-backdrop" onclick="if(event.target===this) cancelEditAuth()">
+    <div class="modal">
+      <h2 style="margin-top:0">${title}</h2>
+      <p class="hint">${hint}</p>
+      <div class="field">${renderScanField('editAuth','Scan barcode',true)}</div>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="cancelEditAuth()">Cancel</button>
+    </div>
+  </div>`;
+}
+function startEditProduct(sku) {
+  state.editingSku = sku;
+  renderTab();
+  const card = document.getElementById('product-form-card');
+  if (card && card.scrollIntoView) card.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function cancelEditProduct() { state.editingSku = null; state.editingStaff = null; renderTab(); }
+async function updateProduct() {
+  const sku = state.editingSku;
+  const p = state.products.find(x => x.sku === sku);
+  if (!p) return;
+  const brand = document.getElementById('p-brand').value.trim();
+  const name = document.getElementById('p-name').value.trim();
+  const price = parseFloat(document.getElementById('p-price').value);
+  const promoRaw = document.getElementById('p-promo').value; const promoPrice = promoRaw!==''?parseFloat(promoRaw): null;
+  const commissionType = document.getElementById('p-commission-type').value;
+  const commission = parseFloat(document.getElementById('p-commission').value) || 0;
+  const bundleQty = parseInt(document.getElementById('p-bundle-qty').value) || 0;
+  const bundleDiscountType = document.getElementById('p-bundle-type').value;
+  const bundleDiscountValue = parseFloat(document.getElementById('p-bundle-value').value) || 0;
+  if (!name || isNaN(price)) return showToast('Please fill in name and original price', true);
+  const prev = { ...p };
+  const editedBy = state.editingStaff ? state.editingStaff.name : '';
+  const editedAt = new Date().toISOString();
+  Object.assign(p, { brand, name, price, promoPrice, promoActive: promoPrice!=null ? p.promoActive : false, commissionType, commission, bundleQty, bundleDiscountType, bundleDiscountValue, editedBy, editedAt });
+  const auditStaff = state.editingStaff;
+  try {
+    await gasUpsert('Products', productToRow(p));
+    logAuditEvent(auditStaff, 'Edit Product', `${p.sku} — ${p.name}`);
+    showToast('Product updated ✓ · '+editedBy); state.editingSku = null; state.editingStaff = null; renderTab();
+  }
+  catch(e) { Object.assign(p, prev); showToast('Save failed', true); renderTab(); }
+}
+async function addBarcode(sku) {
+  const input = document.getElementById('add-bc-'+sku); const val = input.value.trim();
+  if (!val) return showToast('Please enter barcode', true);
+  const p = state.products.find(pr=>pr.sku===sku); if (!p) return;
+  p.barcodes = p.barcodes || [];
+  if (p.barcodes.includes(val)) return showToast('This barcode already exists', true);
+  const conflict = state.products.find(pr => pr.sku!==sku && (pr.barcodes||[]).includes(val));
+  if (conflict) return showToast('This barcode is already used on another product ('+conflict.sku+')', true);
+  p.barcodes.push(val);
+  try { await gasUpsert('Products', productToRow(p)); showToast('Barcode added ✓'); renderTab(); } catch(e) { p.barcodes.pop(); showToast('Save failed', true); }
+}
+async function removeBarcode(sku, barcode) {
+  const p = state.products.find(pr=>pr.sku===sku); if (!p) return;
+  const idx = p.barcodes.indexOf(barcode); if (idx===-1) return;
+  p.barcodes.splice(idx,1);
+  try { await gasUpsert('Products', productToRow(p)); showToast('Barcode removed'); renderTab(); } catch(e) { p.barcodes.splice(idx,0,barcode); showToast('Save failed', true); }
+}
+async function togglePromo(sku, checked) {
+  const p = state.products.find(pr=>pr.sku===sku); if (!p) return; const prev = p.promoActive; p.promoActive = checked;
+  try { await gasUpsert('Products', productToRow(p)); renderTab(); } catch(e) { p.promoActive = prev; showToast('Save failed', true); renderTab(); }
+}
+function downloadProductTemplate() {
+  const sample = [
+    { brand:'Attipas', sku:'AT-BLK-M', barcodes:'1234567890123,9876543210987', name:'Classic Toddler Shoe Black M', price:89, promoPrice:'', commissionType:'fixed', commission:2 },
+    { brand:'Firgi', sku:'FG-POT-01', barcodes:'6912345678901', name:'Non-Stick Pan 20cm', price:129, promoPrice:99, commissionType:'percent', commission:5 },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sample, { header:['brand','sku','barcodes','name','price','promoPrice','commissionType','commission'] });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'products');
+  XLSX.writeFile(wb, 'product_import_template.xlsx');
+}
+async function handleProductImport(input) {
+  const file = input.files[0]; if (!file) return;
+  const resultEl = document.getElementById('product-import-result');
+  resultEl.innerHTML = '<div class="hint">Parsing…</div>';
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
+    let added = 0, updated = 0, skipped = 0;
+    const touched = [];
+    for (const r of rows) {
+      const sku = String(r.sku || r.SKU || r.ISKU || r.isku || r.iSKU || '').trim();
+      if (!sku) { skipped++; continue; }
+      const nameRaw = String(r.name || r.Name || '').trim();
+      const priceRaw = r.price ?? r.Price ?? '';
+      const priceParsed = priceRaw !== '' ? parseFloat(priceRaw) : NaN;
+      const brandRaw = String(r.brand || r.Brand || '').trim();
+      const promoRaw = r.promoPrice ?? r.promo_price ?? r.PromoPrice ?? '';
+      const hasPromoRaw = promoRaw !== '';
+      const promoPriceParsed = hasPromoRaw && !isNaN(parseFloat(promoRaw)) ? parseFloat(promoRaw) : null;
+      const commissionRaw = r.commission ?? r.Commission ?? '';
+      const hasCommissionRaw = commissionRaw !== '';
+      const commissionParsed = hasCommissionRaw ? (parseFloat(commissionRaw) || 0) : null;
+      const commissionTypeRaw = String(r.commissionType || r.commission_type || r.CommissionType || '').trim().toLowerCase();
+      const hasCommissionTypeRaw = commissionTypeRaw !== '';
+      const commissionType = commissionTypeRaw === 'percent' || commissionTypeRaw === '%' ? 'percent' : 'fixed';
+      const barcodesRaw = String(r.barcodes || r.Barcodes || r.barcode || r.UPC || r.upc || '').trim();
+      const barcodes = barcodesRaw ? barcodesRaw.split(',').map(b=>b.trim()).filter(Boolean) : [];
+      const existing = state.products.find(p => p.sku === sku);
+      if (existing) {
+        // 已存在的SKU:只更新這次表格裡實際有填的欄位,留空的欄位保留原本的值(方便只批量改单一欄位,比如只改佣金)
+        const patch = {};
+        if (brandRaw) patch.brand = brandRaw;
+        if (nameRaw) patch.name = nameRaw;
+        if (!isNaN(priceParsed)) patch.price = priceParsed;
+        if (hasPromoRaw) { patch.promoPrice = promoPriceParsed; patch.promoActive = promoPriceParsed!=null; }
+        if (hasCommissionRaw) patch.commission = commissionParsed;
+        if (hasCommissionTypeRaw) patch.commissionType = commissionType;
+        if (barcodes.length) patch.barcodes = barcodes;
+        Object.assign(existing, patch);
+        updated++; touched.push(productToRow(existing));
+      } else {
+        if (!nameRaw || isNaN(priceParsed)) { skipped++; continue; } // 新增產品一定要有名称与原价
+        const p = { brand: brandRaw, sku, name: nameRaw, price: priceParsed, promoPrice: promoPriceParsed, promoActive: promoPriceParsed!=null, commission: commissionParsed||0, commissionType, barcodes };
+        state.products.push(p); added++; touched.push(productToRow(p));
+      }
+    }
+    await gasBulkUpsert('Products', touched);
+    resultEl.innerHTML = `<div class="hint" style="color:var(--teal-deep);font-weight:700">✓ Added ${added} , updated ${updated} ${skipped>0?`, skipped ${skipped} (missing SKU, or a new product missing name/original price)`:''}</div>`;
+    showToast('Import complete ✓'); renderTab();
+  } catch (e) {
+    resultEl.innerHTML = '<div class="hint" style="color:var(--danger)">Parse failed, please check the file format</div>';
+    showToast('Import failed', true);
+  }
+  input.value = '';
+}
+async function doRemoveProduct(sku) {
+  const idx = state.products.findIndex(p=>p.sku===sku); if (idx===-1) return; const removed = state.products.splice(idx,1)[0];
+  try { await gasDelete('Products', sku); logAuditEvent(state.editingStaff, 'Delete Product', `${removed.sku} — ${removed.name}`); showToast('Product removed'); renderTab(); } catch(e) { state.products.splice(idx,0,removed); showToast('Save failed', true); }
+}
+
+// ============ RECORDS (sales + commission) ============
+function renderRecords() {
+  return `
+    <div class="tabs" style="margin-bottom:14px">
+      <button class="tab-btn ${state.recordsSubTab==='sales'?'active':''}" onclick="state.recordsSubTab='sales'; renderTab();">Sales Records</button>
+      <button class="tab-btn ${state.recordsSubTab==='commission'?'active':''}" onclick="state.recordsSubTab='commission'; renderTab();">Commission Records</button>
+      <button class="tab-btn ${state.recordsSubTab==='audit'?'active':''}" onclick="state.recordsSubTab='audit'; renderTab();">Audit Log</button>
+    </div>
+    ${state.recordsSubTab==='sales' ? renderSalesRecords() : state.recordsSubTab==='commission' ? renderCommissionRecords() : renderAuditLog()}
+  `;
+}
+function showOrderDetail(saleId) { state.orderDetailSaleId = saleId; renderTab(); }
+function closeOrderDetail() { state.orderDetailSaleId = null; renderTab(); }
+function renderOrderDetailModal() {
+  if (!state.orderDetailSaleId) return '';
+  const s = state.sales.find(x => x.id === state.orderDetailSaleId);
+  if (!s) return '';
+  const typeLabel = s.type==='return' ? 'Return' : s.type==='exchange' ? 'Exchange' : 'Sale';
+  const relatedReturns = state.sales.filter(x => x.refSaleId === s.id);
+  const origRef = s.refSaleId ? state.sales.find(x => x.id === s.refSaleId) : null;
+  return `<div class="modal-backdrop" onclick="if(event.target===this) closeOrderDetail()">
+    <div class="modal" style="max-width:520px">
+      <h2 style="margin-top:0">Order Details · ${esc(s.transactionNumber)}</h2>
+      <p class="hint">${typeLabel} · ${fmtDateTime(s.timestamp)}</p>
+      ${origRef ? `<p class="hint">Corresponding original transaction: <a style="cursor:pointer;color:var(--teal)" onclick="showOrderDetail('${escAttr(origRef.id)}')">${esc(origRef.transactionNumber)}</a></p>` : ''}
+      ${relatedReturns.length>0 ? `<p class="hint">Related returns/exchanges: ${relatedReturns.map(r=>`<a style="cursor:pointer;color:var(--teal);margin-right:6px" onclick="showOrderDetail('${escAttr(r.id)}')">${esc(r.transactionNumber)}</a>`).join('')}</p>` : ''}
+      <div class="section-title">Item Details</div>
+      ${s.items.map(it => `<div class="rc-line" style="display:flex;justify-content:space-between;margin:4px 0"><div>${it.qty<0?'−':''}${Math.abs(it.qty)}× ${esc(it.name)} <span class="hint" style="margin:0">(${esc(it.sku)})</span></div><div class="num">${money(it.unitPrice*it.qty)}</div></div>`).join('')}
+      <div class="section-title">Amount</div>
+      <div class="summary-row"><div>Subtotal</div><div class="val">${money(s.subtotal)}</div></div>
+      ${(s.bundlePromotions||[]).map(bp => `<div class="summary-row"><div>🎁 ${esc(bp.name)} ×${bp.sets}</div><div class="val">−${money(bp.discountAmount)}</div></div>`).join('')}
+      ${s.manualDiscountAmount>0?`<div class="summary-row"><div>Discount${s.manualDiscountType==='percent'?' ('+s.manualDiscountValue+'%)':''}${s.manualDiscountNote?' · '+esc(s.manualDiscountNote): ''}</div><div class="val">−${money(s.manualDiscountAmount)}</div></div>`:''}
+      ${s.discount>0?`<div class="summary-row"><div>PointsDiscount</div><div class="val">−${money(s.discount)}</div></div>`:''}
+      ${s.cashRoundingAdj!==0?`<div class="summary-row"><div>Cash Rounding</div><div class="val">${s.cashRoundingAdj>0?'+':''}${money(s.cashRoundingAdj)}</div></div>`:''}
+      <div class="summary-row total"><div>Total</div><div class="val ${s.total<0?'red-text':''}">${money(s.total)}</div></div>
+      <div class="section-title">Payment Method</div>
+      ${(s.payments||[]).map(p => `<div class="summary-row"><div>${esc(p.method)}</div><div class="val">${money(p.amount)}</div></div>`).join('') || '<p class="hint">None</p>'}
+      <div class="section-title">Other Info</div>
+      <div class="summary-row"><div>Cashier</div><div class="val">${esc(s.cashier)}</div></div>
+      ${s.processedBy && s.processedBy!==s.cashier ? `<div class="summary-row"><div>Actually Processed By</div><div class="val">${esc(s.processedBy)}</div></div>` : ''}
+      <div class="summary-row"><div>Commission Attributed To</div><div class="val">${esc(s.commissionStaff)} (${money(s.commissionTotal)})</div></div>
+      ${s.memberName ? `<div class="summary-row"><div>Member</div><div class="val">${esc(s.memberName)}</div></div>` : ''}
+      ${s.pointsEarned!==0 ? `<div class="summary-row"><div>Points Change (Earned)</div><div class="val">${s.pointsEarned>0?'+':''}${s.pointsEarned}</div></div>` : ''}
+      ${s.pointsRedeemed!==0 ? `<div class="summary-row"><div>Points Change (Redeemed/Refunded)</div><div class="val">${-s.pointsRedeemed>0?'+':''}${-s.pointsRedeemed}</div></div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-ghost" style="flex:1" onclick="this.disabled=true; this.textContent='Processing…'; reprintSale('${escAttr(s.id)}'); setTimeout(()=>{ this.disabled=false; this.textContent='Reprint Receipt'; },1500);">Reprint Receipt</button>
+        ${(!s.type||s.type==='sale') && !isSaleFullyReturned(s) ? `<button class="btn btn-danger-solid" style="flex:1" onclick="closeOrderDetail(); requestReturnAuth('${escAttr(s.id)}');">Return/Exchange</button>` : ''}
+      </div>
+      <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeOrderDetail()">Close</button>
+    </div>
+  </div>`;
+}
+function filteredSales() {
+  let list = [...state.sales];
+  if (state.recFilterStaff) list = list.filter(s => s.cashierId === state.recFilterStaff);
+  if (state.recFilterDate) list = list.filter(s => s.timestamp.slice(0,10) === state.recFilterDate);
+  const q = (state.recSearchQuery||'').trim().toLowerCase();
+  if (q) list = list.filter(s =>
+    (s.transactionNumber||'').toLowerCase().includes(q) ||
+    (s.memberName||'').toLowerCase().includes(q) ||
+    s.items.some(it => it.name.toLowerCase().includes(q) || it.sku.toLowerCase().includes(q))
+  );
+  return list.reverse();
+}
+function changeSalesPage(delta) { state.salesPage = Math.max(0, state.salesPage + delta); renderTab(); }
+function renderSalesRecords() {
+  const list = filteredSales();
+  const todayStr = new Date().toDateString();
+  const todaySales = state.sales.filter(s => new Date(s.timestamp).toDateString()===todayStr);
+  const todayTotal = todaySales.reduce((s,x)=>s+x.total,0);
+  const pageSize = 300;
+  const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  if (state.salesPage >= totalPages) state.salesPage = totalPages - 1;
+  if (state.salesPage < 0) state.salesPage = 0;
+  const shown = list.slice(state.salesPage * pageSize, (state.salesPage + 1) * pageSize);
+  const typeBadge = (t) => t==='return' ? '<span class="badge badge-danger">Return</span>' : t==='exchange' ? '<span class="badge" style="background:#E7ECFB;color:#3C5AA6">Exchange</span>' : '<span class="badge badge-teal">Sale</span>';
+  const rows = shown.length===0 ? `<tr><td colspan="8"><div class="empty">No sales records match the filters</div></td></tr>` :
+    shown.map(s => {
+      let refHint = '';
+      if (s.refSaleId) {
+        const orig = state.sales.find(x => x.id === s.refSaleId);
+        refHint = orig ? `<div class="hint" style="margin:2px 0 0;font-size:10.5px">Corresponds to: <a style="cursor:pointer;color:var(--teal)" onclick="showOrderDetail('${escAttr(orig.id)}')">${esc(orig.transactionNumber)}</a></div>` : `<div class="hint" style="margin:2px 0 0;font-size:10.5px">Corresponding transaction not found</div>`;
+      }
+      if (!s.type || s.type==='sale') {
+        const related = state.sales.filter(x => x.refSaleId === s.id);
+        if (related.length>0) refHint = `<div class="hint" style="margin:2px 0 0;font-size:10.5px;color:var(--danger)">↳ ${related.map(r=>`<a style="cursor:pointer;color:var(--danger);text-decoration:underline" onclick="showOrderDetail('${escAttr(r.id)}')">${esc(r.transactionNumber)}</a>`).join('、')}${isSaleFullyReturned(s)?' (fully returned)':''}</div>`;
+      }
+      let itemsHint = '';
+      if (s.items.length === 0) itemsHint = '<span class="hint" style="margin:0">—</span>';
+      else {
+        const first = s.items[0];
+        const firstLabel = `${first.qty<0?'−':''}${Math.abs(first.qty)}× ${esc(first.name)}`;
+        itemsHint = `<div style="font-size:12.5px">${firstLabel}${s.items.length>1?` <span class="hint" style="margin:0">+${s.items.length} more</span>`:''}</div>`;
+      }
+      return `<tr>
+      <td><a style="cursor:pointer;color:var(--teal);font-family:var(--mono);font-weight:700;font-size:12.5px" onclick="showOrderDetail('${escAttr(s.id)}')">${esc(s.transactionNumber)}</a></td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--ink-soft);white-space:nowrap">${fmtDateTime(s.timestamp)}</td>
+      <td>${typeBadge(s.type)}${refHint}</td>
+      <td>${itemsHint}</td><td>${esc(s.cashier)}</td>
+      <td>${s.memberName?esc(s.memberName): '<span style="color:var(--ink-soft)">—</span>'}</td>
+      <td><span class="badge badge-teal">${esc(s.payMethod)}</span></td>
+      <td class="num ${s.total<0?'red-text':''}">${money(s.total)}</td></tr>`;
+    }).join('');
+  return `
+    <div class="card"><h2>Today's Sales</h2><div class="summary-row total"><div>${todaySales.length} transactions</div><div class="val">${money(todayTotal)}</div></div></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Sales Records</h2>
+        ${state.sales.length>0 ? `<button class="btn-danger" onclick="clearAllSales()">Clear All Sales Records</button>` : ''}
+      </div>
+      <div class="toolbar">
+        ${renderLiveSearchField('salesSearch','recSearchQuery','Search Transaction No. / Member / Item')}
+        <select id="rec-staff-filter"><option value="">All Cashiers</option>${state.staff.map(s=>`<option value="${s.id}" ${state.recFilterStaff===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>
+        <input type="date" id="rec-date-filter" value="${state.recFilterDate}">
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Transaction No.</th><th>Time</th><th>Type</th><th>Item</th><th>Cashier</th><th>Member</th><th>Payment</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="hint" style="margin-top:8px">Click a transaction number to view details, reprint the receipt, or process a return/exchange.</p>
+      ${renderOrderDetailModal()}
+      ${renderDangerModal()}
+      ${totalPages>1 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px">
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeSalesPage(-1)" ${state.salesPage<=0?'disabled':''}>← Previous</button>
+          <span class="hint" style="margin:0">Page ${state.salesPage+1} of ${totalPages} (${list.length} records)</span>
+          <button class="btn btn-ghost" style="padding:8px 16px" onclick="changeSalesPage(1)" ${state.salesPage>=totalPages-1?'disabled':''}>Next →</button>
+        </div>
+      ` : ''}
+    </div>
+    ${renderReturnAuthModal()}
+    ${renderReturnModal()}`;
+}
+function renderCommissionRecords() {
+  if (!state.commissionAuthStaff) {
+    return `
+      <div class="gate-wrap">
+        <div class="gate-icon">🔒</div>
+        <div class="gate-title">Scan staff card to view commission records</div>
+        <div class="gate-sub">Managers can see everyone's records, staff can only see their own</div>
+        <div class="card">
+          <div class="field">${renderScanField('commissionAuth','Scan barcode',true)}</div>
+        </div>
+      </div>`;
+  }
+  const isManager = state.commissionAuthStaff.role === 'manager';
+  let list = filteredSales();
+  if (!isManager) list = list.filter(s => s.commissionStaffId === state.commissionAuthStaff.id);
+  const byStaff = {};
+  for (const s of list) {
+    const key = s.commissionStaffId;
+    if (!byStaff[key]) byStaff[key] = { name: s.commissionStaff, total: 0, count: 0 };
+    byStaff[key].total += s.commissionTotal; byStaff[key].count += 1;
+  }
+  const summaryRows = Object.values(byStaff).length===0 ? `<tr><td colspan="3"><div class="empty">No commission records</div></td></tr>` :
+    Object.values(byStaff).map(x => `<tr><td>${esc(x.name)}</td><td class="num">${x.count} </td><td class="num" style="font-weight:800">${money(x.total)}</td></tr>`).join('');
+  const totalCount = list.length;
+  const totalCommission = list.reduce((sum,s)=>sum+s.commissionTotal,0);
+  return `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Commission Summary ${isManager?'<span class="badge badge-gold">Manager view · All staff</span>':'<span class="badge badge-teal">'+esc(state.commissionAuthStaff.name)+' · Showing yourself only</span>'}</h2>
+        <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="state.commissionAuthStaff=null; renderTab();">Switch / Rescan</button>
+      </div>
+      <div class="summary-row total"><div>${totalCount} </div><div class="val">${money(totalCommission)}</div></div>
+      <div class="toolbar" style="margin-top:14px">
+        ${isManager ? `<select id="rec-staff-filter"><option value="">All Staff</option>${state.staff.map(s=>`<option value="${s.id}" ${state.recFilterStaff===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>` : ''}
+        <input type="date" id="rec-date-filter" value="${state.recFilterDate}">
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Staff</th><th style="text-align:right">Count</th><th style="text-align:right">Total Commission</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
+      ${isManager ? `<button class="btn btn-ghost" style="margin-top:14px" onclick="exportCommission()">Export Commission Excel (for payroll)</button>` : ''}
+    </div>`;
+}
+function submitCommissionAuth(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  state.commissionAuthStaff = staff;
+  state.scanBuffers.commissionAuth = '';
+  renderTab();
+}
+function submitAuditLogAuth(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  if (staff.role !== 'manager') return showToast('This action requires manager permission', true);
+  state.auditLogAuthStaff = staff;
+  state.scanBuffers.auditLogAuth = '';
+  renderTab();
+}
+function renderAuditLog() {
+  if (!state.auditLogAuthStaff) {
+    return `
+      <div class="gate-wrap">
+        <div class="gate-icon">🔒</div>
+        <div class="gate-title">Scan a manager card to view the audit log</div>
+        <div class="gate-sub">Shows who edited or deleted products/members, and when</div>
+        <div class="card">
+          <div class="field">${renderScanField('auditLogAuth','Scan barcode',true)}</div>
+        </div>
+      </div>`;
+  }
+  const entries = [...state.auditLog].reverse().slice(0, 300);
+  const rows = entries.length===0 ? `<tr><td colspan="4"><div class="empty">No audit log entries yet</div></td></tr>` :
+    entries.map(a => `<tr>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--ink-soft);white-space:nowrap">${fmtDateTime(a.timestamp)}</td>
+      <td>${esc(a.staffName)}</td>
+      <td><span class="badge ${a.action.includes('Delete')?'badge-danger':'badge-teal'}">${esc(a.action)}</span></td>
+      <td>${esc(a.details)}</td>
+    </tr>`).join('');
+  return `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Audit Log</h2>
+        <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="state.auditLogAuthStaff=null; renderTab();">Switch / Rescan</button>
+      </div>
+      <p class="hint">Records who edited or deleted products and members, and when. Showing the latest ${Math.min(300, state.auditLog.length)} of ${state.auditLog.length} entries.</p>
+      <div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Staff</th><th>Action</th><th>Details</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+}
+function submitSettingsAuth(barcode) {
+  const staff = findStaffByBarcode(barcode);
+  if (!staff) return showToast('Work card number not found', true);
+  if (staff.role !== 'manager') return showToast('Settings require manager permission', true);
+  state.settingsAuthStaff = staff;
+  state.scanBuffers.settingsAuth = '';
+  renderTab();
+}
+function submitSettingsPasswordFallback() {
+  const input = document.getElementById('settings-fallback-password');
+  const pw = input ? input.value : '';
+  if (pw !== state.config.adminPassword) return showToast('Incorrect password', true);
+  state.settingsAuthStaff = { name: 'Password Unlock', role: 'manager', id: 'password-override' };
+  state.settingsPasswordFallback = false;
+  renderTab();
+}
+async function exportCommission() {
+  if (state.commissionAuthStaff && state.commissionAuthStaff.role !== 'manager') return showToast('Only managers can export the commission Excel', true);
+  let list = filteredSales();
+  if (list.length===0) return showToast('No data to export', true);
+  const rows = list.map(s => ({ date: s.timestamp.slice(0,10), time: fmtDateTime(s.timestamp), staff: s.commissionStaff, items: s.items.length, commission: s.commissionTotal }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Commission');
+  const filename = 'commission_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  XLSX.writeFile(wb, filename);
+  showToast('Downloaded ✓ syncing to Drive…');
+  try {
+    const base64 = XLSX.write(wb, { type:'base64', bookType:'xlsx' });
+    await gasSaveFile(filename, base64, XLSX_MIME);
+    showToast('Saved to Google Drive ✓');
+  } catch(e) { showToast('Downloaded, but saving to Drive failed', true); }
+}
+
+// ============ SHIFTS ============
+function renderShifts() {
+  if (state.shiftDetailId) return renderShiftDetail(state.shiftDetailId);
+  const list = [...state.shifts].reverse();
+  const rows = list.length===0 ? `<tr><td colspan="6"><div class="empty">No shift records yet</div></td></tr>` :
+    list.map(s => `<tr style="cursor:pointer" onclick="viewShiftDetail('${escAttr(s.id)}')">
+      <td>${fmtDateTime(s.openedAt)}</td>
+      <td>${s.status==='open'?'<span class="badge badge-teal">In Progress</span>':'<span class="badge" style="background:#F4F1EA;color:var(--ink-soft)">Closed</span>'}</td>
+      <td>${esc(s.openedByName)}</td>
+      <td class="num">${money(s.startingCash)}</td>
+      <td class="num">${s.status==='closed'?money(s.totals.total): '—'}</td>
+      <td class="num ${s.status==='closed' && s.variance!==0 ? 'red-text':''}">${s.status==='closed'?(s.variance>=0?'+':'')+money(s.variance): '—'}</td>
+    </tr>`).join('');
+  return `<div class="card"><h2>Shift Records</h2><p class="hint">Click a row to view details。</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Opened At</th><th>Status</th><th>Opened By</th><th style="text-align:right">Starting Cash</th><th style="text-align:right">Total Sales</th><th style="text-align:right">Cash Variance</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div>`;
+}
+function viewShiftDetail(id) { state.shiftDetailId = id; renderTab(); }
+function renderShiftDetail(id) {
+  const shift = state.shifts.find(s=>s.id===id); if (!shift) { state.shiftDetailId=null; return renderShifts(); }
+  const totals = shift.status==='closed' ? shift.totals : computeShiftTotals(shift.id);
+  const drawerEvents = state.drawerEvents.filter(e => e.shiftId === shift.id);
+  const salesInShift = state.sales.filter(s => s.shiftId === shift.id);
+  return `
+    <button class="btn btn-ghost" style="margin-bottom:14px" onclick="state.shiftDetailId=null; renderTab();">← Back to Shift List</button>
+    <div class="stat-row">
+      <div class="stat"><div class="num">${totals.count}</div><div class="label">Transaction Count</div></div>
+      <div class="stat"><div class="num">${money(totals.total)}</div><div class="label">Total Sales</div></div>
+      <div class="stat"><div class="num">${money(totals.cash)}</div><div class="label">Cash</div></div>
+      <div class="stat"><div class="num ${shift.status==='closed'&&shift.variance!==0?'red-text':''}">${shift.status==='closed'?(shift.variance>=0?'+':'')+money(shift.variance): '—'}</div><div class="label">Cash Variance</div></div>
+    </div>
+    <div class="card">
+      <h2>Payment Method Breakdown</h2>
+      <div class="summary-row"><div>Cash</div><div class="val">${money(totals.cash)}</div></div>
+      <div class="summary-row"><div>Credit Card</div><div class="val">${money(totals.creditCard)}</div></div>
+      <div class="summary-row"><div>Debit Card</div><div class="val">${money(totals.debitCard)}</div></div>
+      <div class="summary-row"><div>E-wallet</div><div class="val">${money(totals.ewallet)}</div></div>
+      <div class="summary-row"><div>Store Credit</div><div class="val">${money(totals.storeCredit)}</div></div>
+      ${shift.status==='closed' ? `
+        <div class="section-title">Cash Reconciliation</div>
+        <div class="summary-row"><div>Starting Cash</div><div class="val">${money(shift.startingCash)}</div></div>
+        <div class="summary-row"><div>Expected Cash</div><div class="val">${money(shift.expectedCash)}</div></div>
+        <div class="summary-row"><div>Actual Counted</div><div class="val">${money(shift.actualCash)}</div></div>
+        <div class="summary-row total"><div>Variance</div><div class="val ${shift.variance!==0?'red-text':''}">${shift.variance>=0?'+':''}${money(shift.variance)}</div></div>
+        <p class="hint" style="margin-top:8px">Closed By:${esc(shift.closedByName)} · ${fmtDateTime(shift.closedAt)}</p>
+      ` : `<p class="hint" style="margin-top:8px">Shift is still in progress, not yet closed。</p>`}
+    </div>
+    ${drawerEvents.length>0 ? `
+      <div class="card">
+        <h2 style="color:var(--danger)">⚠ Non-Transaction Drawer Openings</h2>
+        <div style="overflow-x:auto"><table><thead><tr><th>Time</th><th>Staff</th></tr></thead><tbody>
+          ${drawerEvents.map(e => `<tr class="flagged"><td>${fmtDateTime(e.timestamp)}</td><td>${esc(e.staffName)}</td></tr>`).join('')}
+        </tbody></table></div>
+      </div>` : ''}
+    <div class="card">
+      <h2>End-of-Day Inventory Export</h2>
+      <p class="hint">Summarizes this shift's sales quantity by SKU, exported in a stock-adjustment format for direct upload to your inventory system to deduct stock.</p>
+      <button class="btn btn-primary" onclick="exportSiteGiant('${escAttr(shift.id)}')" ${salesInShift.length===0?'disabled':''}>Upload Stock Adjustment to Drive</button>
+    </div>
+  `;
+}
+async function exportSiteGiant(shiftId) {
+  const salesInShift = state.sales.filter(s => s.shiftId === shiftId);
+  if (salesInShift.length===0) return showToast('This shift has no sales records', true);
+  const skuMap = {};
+  for (const s of salesInShift) for (const it of s.items) { skuMap[it.sku] = (skuMap[it.sku]||0) + it.qty; }
+  const rows = Object.keys(skuMap).map(sku => ({ isku: sku, quantity_change: -skuMap[sku] }));
+  const ws = XLSX.utils.json_to_sheet(rows, { header:['isku','racks','batches','quantity_change'] });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'stock-adjustment');
+  const filename = 'stock_adjustment_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  showToast('Uploading to Google Drive…');
+  try {
+    const base64 = XLSX.write(wb, { type:'base64', bookType:'xlsx' });
+    await gasSaveFile(filename, base64, XLSX_MIME);
+    showToast('Saved to Google Drive ✓');
+  } catch(e) { showToast('Failed to save to Google Drive, please try again', true); }
+}
+
+// ============ SETTINGS ============
+function renderSettings() {
+  if (!state.settingsAuthStaff) {
+    return `
+      <div class="gate-wrap">
+        <div class="gate-icon">🔒</div>
+        <div class="gate-title">Scan a manager card to enter Settings</div>
+        <div class="gate-sub">Settings involve sensitive configuration like shop info, points rules, and staff management</div>
+        <div class="card">
+          <div class="field">${renderScanField('settingsAuth','Scan barcode',true)}</div>
+          ${state.settingsPasswordFallback ? `
+            <div class="field" style="margin-top:12px">
+              <label>Admin password (backup unlock method)</label>
+              <input id="settings-fallback-password" type="password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter'){event.preventDefault(); submitSettingsPasswordFallback();}">
+            </div>
+            <button class="btn btn-primary btn-full" onclick="submitSettingsPasswordFallback()">Unlock with Password</button>
+          ` : `<p class="hint" style="margin-top:12px;text-align:center"><a style="cursor:pointer;color:var(--teal)" onclick="state.settingsPasswordFallback=true; renderTab();">Don't have a manager card handy? Unlock with the admin password</a></p>`}
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="hint" style="margin:0">Authorized by <b style="color:var(--ink)">${esc(state.settingsAuthStaff.name)}</b></div>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="state.settingsAuthStaff=null; renderTab();">Leave Settings</button>
+    </div>
+    <div class="card">
+      <h2>Shop Info (Receipt Header)</h2>
+      <div class="field"><label>Shop Name</label><input id="s-shopname" value="${esc(state.config.shopName)}"></div>
+      <div class="field"><label>Address (Line 1)</label><input id="s-address1" value="${esc(state.config.addressLine1||'')}"></div>
+      <div class="field"><label>Address (Line 2)</label><input id="s-address2" value="${esc(state.config.addressLine2||'')}"></div>
+      <div class="field"><label>Address (Line 3, optional)</label><input id="s-address3" value="${esc(state.config.addressLine3||'')}"></div>
+      <div class="row">
+        <div class="field"><label>Phone</label><input id="s-phone" value="${esc(state.config.phone)}"></div>
+        <div class="field"><label>SST Registration No.</label><input id="s-sst" value="${esc(state.config.sstNo)}"></div>
+      </div>
+      <div class="field"><label>Receipt Paper Width</label>
+        <select id="s-paperwidth"><option value="80" ${state.config.paperWidth==='80'?'selected':''}>80mm</option><option value="58" ${state.config.paperWidth==='58'?'selected':''}>58mm</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="saveShopInfo()">Save Shop Info</button>
+    </div>
+    <div class="card">
+      <h2>Points Rules (default rate, for tierless members/guests)</h2>
+      <div class="row">
+        <div class="field"><label>Earn Rate (points earned per RM1 spent)</label><input id="s-earn" type="number" step="0.1" min="0" value="${state.config.pointsPerRM}"></div>
+        <div class="field"><label>Redeem Rate (1 point = how many RM)</label><input id="s-redeem" type="number" step="0.01" min="0" value="${state.config.pointValueRM}"></div>
+      </div>
+      <button class="btn btn-primary" onclick="savePointsRules()">Save Points Rules</button>
+    </div>
+    <div class="card">
+      <h2>Membership Tiers</h2>
+      <p class="hint">Auto-upgrades based on cumulative lifetime spend, never auto-downgrades. List tiers from lowest to highest — the higher the threshold, the lower it should sit in the list.</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Tier Name</th><th style="text-align:right">Upgrade Threshold (RM)</th><th style="text-align:right">Earn Rate (pt/RM1)</th><th style="text-align:right">Redeem Rate (RM/pt)</th><th></th></tr></thead>
+        <tbody>
+          ${(state.config.tiers||[]).map((t,i) => `<tr>
+            <td><input type="text" value="${esc(t.name)}" onchange="updateTierField(${i},'name',this.value)"></td>
+            <td><input type="number" step="1" min="0" value="${t.threshold}" style="text-align:right" onchange="updateTierField(${i},'threshold',parseFloat(this.value)||0)"></td>
+            <td><input type="number" step="0.1" min="0" value="${t.earnRate}" style="text-align:right" onchange="updateTierField(${i},'earnRate',parseFloat(this.value)||0)"></td>
+            <td><input type="number" step="0.01" min="0" value="${t.redeemRate}" style="text-align:right" onchange="updateTierField(${i},'redeemRate',parseFloat(this.value)||0)"></td>
+            <td><button class="btn-danger" onclick="removeTier(${i})">Delete</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+      <button class="btn btn-ghost" style="margin-top:12px" onclick="addTier()">+ Add Tier</button>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="saveTiers()">Save Tier Settings</button>
+    </div>
+    <div class="card">
+      <h2>Bundle Promotions</h2>
+      <p class="hint">Automatic "buy X, get discount" promotions across a set of products — either a specific list of SKUs, or a whole brand. Applies automatically at checkout once the combined quantity of matching items in the cart reaches the threshold, repeating for every complete set.</p>
+      ${(state.config.bundlePromotions||[]).map((bp,i) => `
+        <div class="card" style="background:var(--panel);margin-top:${i===0?'0':'12px'}">
+          <div class="row">
+            <div class="field"><label>Promotion Name</label><input type="text" value="${esc(bp.name||'')}" placeholder="e.g. Mix &amp; Match Attipas" onchange="updateBundlePromo(${i},'name',this.value)"></div>
+            <div class="field"><label>Match By</label>
+              <select onchange="updateBundlePromo(${i},'matchType',this.value)">
+                <option value="sku" ${bp.matchType==='sku'?'selected':''}>Specific SKUs</option>
+                <option value="brand" ${bp.matchType==='brand'?'selected':''}>Whole Brand</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>${bp.matchType==='brand'?'Brand name (exact match)':'SKUs (comma-separated)'}</label><input type="text" value="${esc((bp.matchValues||[]).join(', '))}" placeholder="${bp.matchType==='brand'?'e.g. Attipas':'e.g. AT-BLK-M, AT-BLK-S, AT-PNK-M'}" onchange="updateBundlePromo(${i},'matchValues',this.value.split(',').map(s=>s.trim()).filter(Boolean))"></div>
+          <div class="row3">
+            <div class="field"><label>Buy quantity to trigger</label><input type="number" step="1" min="0" value="${bp.qty||''}" onchange="updateBundlePromo(${i},'qty',parseInt(this.value)||0)"></div>
+            <div class="field"><label>Discount Type</label>
+              <select onchange="updateBundlePromo(${i},'discountType',this.value)">
+                <option value="amount" ${bp.discountType==='amount'?'selected':''}>Fixed Amount (RM per set)</option>
+                <option value="percent" ${bp.discountType==='percent'?'selected':''}>Percentage (% off that set)</option>
+              </select>
+            </div>
+            <div class="field"><label>Discount value</label><input type="number" step="0.01" min="0" value="${bp.discountValue||''}" onchange="updateBundlePromo(${i},'discountValue',parseFloat(this.value)||0)"></div>
+          </div>
+          <button class="btn-danger" onclick="removeBundlePromo(${i})">Delete</button>
+        </div>`).join('') || '<p class="hint">No bundle promotions yet.</p>'}
+      <button class="btn btn-ghost" style="margin-top:12px" onclick="addBundlePromo()">+ Add Bundle Promotion</button>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="saveBundlePromos()">Save Bundle Promotions</button>
+    </div>
+    <div class="card">
+      <h2>Admin password</h2>
+      <p class="hint">Irreversible actions like clearing all members require entering this password first. Please set a password staff can't easily guess.</p>
+      <div class="field"><label>Admin password</label><input id="s-admin-password" type="password" value="${esc(state.config.adminPassword)}" placeholder="Default 0000, please change it soon"></div>
+      <button class="btn btn-primary" onclick="saveAdminPassword()">Save Admin Password</button>
+    </div>
+    <div class="card">
+      <h2>Printer Diagnostics</h2>
+      <p class="hint">Check whether this device has the native iMin print SDK, no developer tools needed.</p>
+      <button class="btn btn-ghost" onclick="checkIminSdkDiagnostic()">Check iMin SDK</button>
+      <div id="imin-diagnostic-result" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>Staff / Work Cards</h2>
+      <p class="hint">The work card number is the barcode scanned for login, checkout, shift open/close, opening the drawer, editing products, and viewing commission records. "Manager" role can view everyone's commission records; staff scanning their card can only see their own.</p>
+      <div class="row3" style="align-items:end">
+        <div class="field" style="margin-bottom:0"><label>Name</label><input id="s-staff-name" placeholder="e.g. Amy"></div>
+        <div class="field" style="margin-bottom:0"><label>Work Card No. / Barcode</label><input id="s-staff-barcode" placeholder="e.g. EMP001"></div>
+        <div class="field" style="margin-bottom:0"><label>Role</label>
+          <select id="s-staff-role">
+            <option value="staff">Staff</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:2px" onclick="addStaff()">Add Staff</button>
+      <div class="section-title">Staff List (${state.staff.length})</div>
+      <div class="chip-list">${state.staff.map(s => `<div class="chip">${esc(s.name)} ${s.role==='manager'?'<span class="badge badge-gold" style="font-size:9px">Manager</span>':''} <span style="color:var(--ink-soft);font-family:var(--mono);font-size:11px">(${esc(s.barcode)})</span><button onclick="removeStaff('${escAttr(s.id)}')">×</button></div>`).join('') || '<p class="hint">No staff added yet</p>'}</div>
+    </div>
+  `;
+}
+function updateTierField(idx, field, value) {
+  if (!state.config.tiers || !state.config.tiers[idx]) return;
+  state.config.tiers[idx][field] = value;
+}
+function addTier() {
+  state.config.tiers = state.config.tiers || [];
+  state.config.tiers.push({ name:'New Tier', threshold:0, earnRate:1, redeemRate:0.1 });
+  renderTab();
+}
+function removeTier(idx) {
+  if (!state.config.tiers) return;
+  state.config.tiers.splice(idx,1);
+  renderTab();
+}
+async function saveTiers() {
+  const prev = JSON.parse(JSON.stringify(state.config.tiers||[]));
+  try { await saveConfig(); showToast('Tier settings saved ✓'); renderTab(); }
+  catch(e) { state.config.tiers = prev; showToast('Save failed', true); renderTab(); }
+}
+function updateBundlePromo(idx, field, value) {
+  if (!state.config.bundlePromotions || !state.config.bundlePromotions[idx]) return;
+  state.config.bundlePromotions[idx][field] = value;
+  if (field === 'matchType') renderTab();
+}
+function addBundlePromo() {
+  state.config.bundlePromotions = state.config.bundlePromotions || [];
+  state.config.bundlePromotions.push({ name:'New Promotion', matchType:'sku', matchValues:[], qty:2, discountType:'amount', discountValue:0 });
+  renderTab();
+}
+function removeBundlePromo(idx) {
+  if (!state.config.bundlePromotions) return;
+  state.config.bundlePromotions.splice(idx,1);
+  renderTab();
+}
+async function saveBundlePromos() {
+  const prev = JSON.parse(JSON.stringify(state.config.bundlePromotions||[]));
+  try { await saveConfig(); showToast('Bundle promotions saved ✓'); renderTab(); }
+  catch(e) { state.config.bundlePromotions = prev; showToast('Save failed', true); renderTab(); }
+}
+async function saveAdminPassword() {
+  const pw = document.getElementById('s-admin-password').value.trim();
+  if (!pw) return showToast('Password cannot be blank', true);
+  const prev = state.config.adminPassword;
+  state.config.adminPassword = pw;
+  try { await saveConfig(); showToast('Admin password updated ✓'); } catch(e) { state.config.adminPassword = prev; showToast('Save failed', true); render(); }
+}
+async function saveShopInfo() {
+  state.config.shopName = document.getElementById('s-shopname').value.trim() || 'Tinker Toddler';
+  state.config.addressLine1 = document.getElementById('s-address1').value.trim();
+  state.config.addressLine2 = document.getElementById('s-address2').value.trim();
+  state.config.addressLine3 = document.getElementById('s-address3').value.trim();
+  state.config.phone = document.getElementById('s-phone').value.trim();
+  state.config.sstNo = document.getElementById('s-sst').value.trim();
+  state.config.paperWidth = document.getElementById('s-paperwidth').value;
+  try { await saveConfig(); showToast('Saved ✓'); render(); } catch(e){ showToast('Save failed', true); }
+}
+async function savePointsRules() {
+  const earn = parseFloat(document.getElementById('s-earn').value); const redeem = parseFloat(document.getElementById('s-redeem').value);
+  if (isNaN(earn)||isNaN(redeem)||earn<0||redeem<0) return showToast('Please enter a valid number', true);
+  state.config.pointsPerRM = earn; state.config.pointValueRM = redeem;
+  try { await saveConfig(); showToast('Points rules saved ✓'); renderTab(); } catch(e){ showToast('Save failed', true); }
+}
+async function addStaff() {
+  const name = document.getElementById('s-staff-name').value.trim(); const barcode = document.getElementById('s-staff-barcode').value.trim();
+  const role = document.getElementById('s-staff-role').value;
+  if (!name||!barcode) return showToast('Please fill in name and work card number', true);
+  if (state.staff.some(s=>s.barcode.toLowerCase()===barcode.toLowerCase())) return showToast('This work card number already exists', true);
+  const staff = { id:'stf_'+Date.now(), name, barcode, role };
+  state.staff.push(staff);
+  try { await gasUpsert('Staff', staffToRow(staff)); showToast('Staff added ✓'); renderTab(); } catch(e) { state.staff.pop(); showToast('Save failed', true); }
+}
+async function removeStaff(id) {
+  const idx = state.staff.findIndex(s=>s.id===id); if (idx===-1) return; const removed = state.staff.splice(idx,1)[0];
+  try { await gasDelete('Staff', id); showToast('Staff removed'); renderTab(); } catch(e) { state.staff.splice(idx,0,removed); showToast('Save failed', true); }
+}
+
+loadAll();
+</script>
+</body>
+</html>
