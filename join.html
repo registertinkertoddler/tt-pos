@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join Babytopia Membership</title>
+<meta name="theme-color" content="#2C4E47">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  :root {
+    --bg: #FAF7F2; --panel: #FFFFFF; --ink: #26302B; --ink-soft: #6B7570; --line: #E6E0D6;
+    --teal: #3F6E64; --teal-deep: #2C4E47; --coral: #E1815F; --coral-soft: #FBEAE1;
+    --danger: #C24A3F; --danger-soft: #FBEAE8;
+    --sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans); background: var(--bg); color: var(--ink);
+    min-height: 100vh; -webkit-font-smoothing: antialiased;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .wrap { width: 100%; max-width: 420px; }
+  .logo { text-align: center; margin-bottom: 18px; }
+  .logo .brand { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--teal-deep); }
+  .logo .brand span { color: var(--coral); }
+  .logo .sub { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 26px 22px; box-shadow: 0 10px 30px rgba(44,78,71,0.06); }
+  .card h1 { font-size: 17px; margin: 0 0 6px; color: var(--teal-deep); }
+  .card .desc { font-size: 13px; color: var(--ink-soft); margin: 0 0 20px; line-height: 1.5; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  input { width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 10px; font-family: var(--sans); font-size: 16px; background: #fff; color: var(--ink); }
+  input:focus { outline: none; border-color: var(--teal); }
+  .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; font-family: var(--sans); font-weight: 700; font-size: 15px; cursor: pointer; background: var(--teal-deep); color: #fff; }
+  .btn:active { background: var(--teal); }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .msg { font-size: 13px; margin-top: 12px; text-align: center; }
+  .msg.error { color: var(--danger); }
+  .result { text-align: center; padding: 10px 0; }
+  .result .icon { font-size: 44px; margin-bottom: 10px; }
+  .result h2 { font-size: 17px; color: var(--teal-deep); margin: 0 0 8px; }
+  .result p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+  .foot { text-align: center; font-size: 11.5px; color: var(--ink-soft); margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <div class="brand">Babytopia<span> POS</span></div>
+    <div class="sub">Member Sign-Up · 會員登記</div>
+  </div>
+  <div class="card" id="card">
+    <h1>Join as a Member</h1>
+    <p class="desc">Fill in your name and phone number to join — earn points and get member pricing on your next purchase.<br>填寫姓名和電話號碼即可加入會員,下次購物可累積積分並享會員優惠價。</p>
+    <form id="join-form">
+      <div class="field">
+        <label>Full Name 姓名</label>
+        <input id="f-name" type="text" placeholder="e.g. Tan Mei Ling" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label>Phone Number 電話號碼</label>
+        <input id="f-phone" type="tel" inputmode="tel" placeholder="e.g. 0123456789" autocomplete="tel" required>
+      </div>
+      <button class="btn" id="submit-btn" type="submit">Join Now 立即加入</button>
+      <div class="msg error" id="err-msg" style="display:none"></div>
+    </form>
+  </div>
+  <div class="foot">Babytopia by Tinker Toddler Sdn Bhd</div>
+</div>
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxB27SdQrtB_muQB8XSnX2l8SC_BGpf5Bs1-IrEbRmrXY49kwpG28T_qN1trq_d2JcQ/exec';
+
+document.getElementById('join-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('f-name').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const errEl = document.getElementById('err-msg');
+  errEl.style.display = 'none';
+
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (!name) { showError('Please enter your name 請輸入姓名'); return; }
+  if (digits.length < 8) { showError('Please enter a valid phone number 請輸入正確的電話號碼'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting… 送出中…';
+
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'joinMember', name, phone })
+    });
+    const data = await res.json();
+    if (!data.success) { showError('Something went wrong, please try again or ask a staff member for help 發生錯誤,請重試或請店員協助'); btn.disabled = false; btn.textContent = 'Join Now 立即加入'; return; }
+    if (data.status === 'existing') {
+      showResult('👋', 'Welcome back!', 'This phone number is already registered as a member — no need to sign up again. Just mention your phone number at checkout.<br>此電話號碼已經是會員,不需要重複登記,結帳時報上電話號碼即可。');
+    } else {
+      showResult('🎉', 'You\'re in!', 'Welcome to Babytopia membership! Show this phone number at checkout to start earning points and enjoy member pricing.<br>歡迎加入Babytopia會員!結帳時報上電話號碼即可開始累積積分、享受會員優惠價。');
+    }
+  } catch (err) {
+    showError('Network error, please try again 網路錯誤,請重試');
+    btn.disabled = false;
+    btn.textContent = 'Join Now 立即加入';
+  }
+});
+
+function showError(msg) {
+  const errEl = document.getElementById('err-msg');
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+}
+function showResult(icon, title, desc) {
+  document.getElementById('card').innerHTML = `
+    <div class="result">
+      <div class="icon">${icon}</div>
+      <h2>${title}</h2>
+      <p>${desc}</p>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
